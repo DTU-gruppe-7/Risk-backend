@@ -1,0 +1,79 @@
+# ============================================================================
+#  Risk backend - .gitignore
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Build-output
+# ----------------------------------------------------------------------------
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+artifacts/
+publish/
+
+# ----------------------------------------------------------------------------
+# MSBuild, NuGet og test
+# ----------------------------------------------------------------------------
+*.binlog
+project.lock.json
+project.fragment.lock.json
+packages/
+*.nupkg
+*.snupkg
+[Tt]est[Rr]esult*/
+coverage/
+*.coverage
+*.trx
+
+# ----------------------------------------------------------------------------
+# Hemmeligheder og certifikater
+#
+# Bemærk: appsettings.Development.json er IKKE ignoreret. Den indeholder kun
+# den fælles lokale databaseopsætning. Rigtige hemmeligheder ligger i
+# user-secrets, som aldrig befinder sig i repoet.
+#
+# Bemærk også: Risk.Api/openapi.json er IKKE ignoreret. Den er API'ets
+# kontrakt og skal versioneres, så ændringer er synlige i pull requests.
+# ----------------------------------------------------------------------------
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+devcert.pem
+
+# ----------------------------------------------------------------------------
+# Editor og IDE
+# ----------------------------------------------------------------------------
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.sln.iml
+*.swp
+*~
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# ----------------------------------------------------------------------------
+# Operativsystem
+# ----------------------------------------------------------------------------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini

@@ -1,0 +1,35 @@
+# ============================================================================
+#  Risk backend - .gitattributes
+#
+#  Normaliserer linjeskift, så Windows- og Mac-maskiner ikke skiftes til at
+#  ændre hver eneste linje i hver eneste fil.
+# ============================================================================
+
+# Git gemmer altid LF. Arbejdsmappen får LF på alle platforme.
+* text=auto eol=lf
+
+# Filer der kræver CRLF for at virke på Windows
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sln text eol=crlf
+
+# Shell-scripts skal altid have LF, også når de checkes ud på Windows
+*.sh  text eol=lf
+
+# Binære filer må ikke røres
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.dll   binary
+*.pfx   binary
+*.snk   binary
+
+# Genereret kontrakt: fold den sammen i diffs, men versionér den
+Risk.Api/openapi.json linguist-generated
+
+# EF Core migrations er genereret og fylder meget i reviews
+**/Migrations/*.Designer.cs linguist-generated
+**/Migrations/*ModelSnapshot.cs linguist-generated
