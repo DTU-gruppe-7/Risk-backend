@@ -1,0 +1,8 @@
+﻿**/.git
+**/.idea
+**/.vs
+**/bin
+**/obj
+**/out
+*.user
+setup-dev-secrets.ps1

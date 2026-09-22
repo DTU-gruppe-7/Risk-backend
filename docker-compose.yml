@@ -1,0 +1,47 @@
+﻿services:
+  db:
+    image: postgres:17-alpine
+    container_name: risk-postgres-db
+    environment:
+      POSTGRES_DB: RiskDB
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: Passw0rd
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d RiskDB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - risk-network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: risk-api-server
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      # Overskriver ConnectionStrings:Default - 'Host=db' peger på db servicen i Docker-netværket
+      - ConnectionStrings__Default=Host=db;Port=5432;Database=RiskDB;Username=user;Password=Passw0rd
+      # Midlertidig JWT-nøgle til brug i container-miljøet (min. 32 tegn)
+      - Jwt__Key=super_secret_development_jwt_key_for_docker_testing_only_12345
+    ports:
+      - "5000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - risk-network
+
+volumes:
+  pgdata:
+
+networks:
+  risk-network:
+    driver: bridge
