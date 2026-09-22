@@ -14,10 +14,15 @@ public class Repository<T>(AppDbContext context) : IRepository<T> where T : clas
         await _dbSet.AddAsync(entity);
     }
 
+    public virtual async Task<T?> GetByIdAsync(Guid id)
+    {
+        return await _dbSet.FindAsync(id);
+    }
+
     public virtual async Task<T?> GetByUuidAsync(Guid? uuid)
     {
         if (uuid is null) return null;
-        return await _dbSet.FindAsync(uuid);
+        return await _dbSet.FindAsync(uuid.Value);
     }
 
     public virtual async Task<IEnumerable<T>> GetAllAsync()
@@ -40,9 +45,9 @@ public class Repository<T>(AppDbContext context) : IRepository<T> where T : clas
         return Task.CompletedTask;
     }
 
-    public virtual async Task<bool> ExistsAsync(Guid uuid)
+    public virtual async Task<bool> ExistsAsync(Guid id)
     {
-        return await _dbSet.FindAsync(uuid) != null;
+        return await _dbSet.FindAsync(id) != null;
     }
 
     public virtual async Task SaveChangesAsync()
