@@ -28,7 +28,7 @@
 
   <PropertyGroup>
     <!-- openapi.json genereres ved hvert build, ved siden af csproj-filen -->
-    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiGenerateDocumentsOnBuild>false</OpenApiGenerateDocumentsOnBuild>
     <OpenApiDocumentsDirectory>.</OpenApiDocumentsDirectory>
     <OpenApiGenerateDocumentsOptions>--file-name openapi</OpenApiGenerateDocumentsOptions>
     <!-- XML-kommentarer bliver til beskrivelser i OpenAPI-dokumentet -->

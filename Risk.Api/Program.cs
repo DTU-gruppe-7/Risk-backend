@@ -1,10 +1,10 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json.Serialization;
 using System.Reflection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using Risk.Infrastructure;
+using Risk.Api.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
