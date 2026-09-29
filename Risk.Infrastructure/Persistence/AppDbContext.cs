@@ -96,20 +96,37 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.ToTable("continents");
             entity.HasKey(c => c.Id);
             entity.Property(c => c.Name).HasMaxLength(100).IsRequired();
-        });
 
-        // --- Territory ---
-        builder.Entity<Territory>(entity =>
-        {
-            entity.ToTable("territories");
-            entity.HasKey(t => t.Id);
-            entity.Property(t => t.Identifier).HasMaxLength(100).IsRequired();
+            entity.HasOne(c => c.Game)
+                .WithMany(g => g.Continents)
+                .HasForeignKey(c => c.GameId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(t => t.Continent)
-                .WithMany()
+            entity.Navigation(c => c.Territories).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            entity.HasMany(c => c.Territories)
+                .WithOne(t => t.Continent)
                 .HasForeignKey(t => t.ContinentId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        // --- Territory ---
+                builder.Entity<Territory>(entity =>
+                {
+                    entity.ToTable("territories");
+                    entity.HasKey(t => t.Id);
+                    entity.Property(t => t.Identifier).HasMaxLength(100).IsRequired();
+        
+                    // Definer eksplicit GameId som en Guid shadow property
+                    entity.Property<Guid>("GameId");
+        
+                    entity.Navigation(t => t.Neighbors).UsePropertyAccessMode(PropertyAccessMode.Field);
+        
+                    entity.HasOne<Game>()
+                        .WithMany(g => g.Territories)
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
 
         // --- Territory Borders (Many-to-Many self reference) ---
         builder.Entity<TerritoryBorder>(entity =>
