@@ -28,6 +28,9 @@ public static class InfrastructureServiceExtensions
         // Repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IGameRepository, GameRepository>();
+        services.AddScoped<ITerritoryRepository, TerritoryRepository>();
+        services.AddScoped<IPlayerRepository, PlayerRepository>();
 
         return services;
     }
