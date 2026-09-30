@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Risk.Application.Interfaces;
 using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 
@@ -22,6 +23,8 @@ public static class DependencyInjection
             })
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<AppDbContext>();
+
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         return services;
     }

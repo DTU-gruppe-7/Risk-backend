@@ -10,12 +10,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     // Bemærk navnet: IdentityDbContext har allerede en Users-property til
     // ApplicationUser, så domæne-brugerne får deres eget navn.
-    public DbSet<User> DomainUsers => Set<User>();
+    public DbSet<User> DomainUsers           => Set<User>();
+    public DbSet<Game> Games                 => Set<Game>();
+    public DbSet<GameSetting> GameSettings   => Set<GameSetting>();
+    public DbSet<Player> Players             => Set<Player>();
+    public DbSet<Continent> Continents       => Set<Continent>();
+    public DbSet<Territory> Territories      => Set<Territory>();
+    public DbSet<TerritoryBorder> TerritoryBorders => Set<TerritoryBorder>();
+    public DbSet<BonusCard> BonusCards       => Set<BonusCard>();
+    public DbSet<MissionCard> MissionCards   => Set<MissionCard>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
+        // ------------------------------------------------------------------
+        // User
+        // ------------------------------------------------------------------
         builder.Entity<User>(entity =>
         {
             entity.ToTable("users");
@@ -31,5 +42,148 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .WithOne()
             .HasForeignKey<ApplicationUser>(a => a.DomainUserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ------------------------------------------------------------------
+        // Game
+        // ------------------------------------------------------------------
+        builder.Entity<Game>(entity =>
+        {
+            entity.ToTable("games");
+            entity.HasKey(g => g.Id);
+            entity.Property(g => g.State).HasConversion<string>().HasMaxLength(20);
+            entity.Property(g => g.CurrentPhase).HasConversion<string>().HasMaxLength(20);
+
+            entity.HasOne(g => g.Settings)
+                  .WithOne(s => s.Game)
+                  .HasForeignKey<GameSetting>(s => s.GameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(g => g.Players)
+                  .WithOne(p => p.Game)
+                  .HasForeignKey(p => p.GameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(g => g.Continents)
+                  .WithOne(c => c.Game)
+                  .HasForeignKey(c => c.GameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ------------------------------------------------------------------
+        // GameSetting
+        // ------------------------------------------------------------------
+        builder.Entity<GameSetting>(entity =>
+        {
+            entity.ToTable("game_settings");
+            entity.HasKey(s => s.Id);
+        });
+
+        // ------------------------------------------------------------------
+        // Player
+        // ------------------------------------------------------------------
+        builder.Entity<Player>(entity =>
+        {
+            entity.ToTable("players");
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Color).HasMaxLength(30).IsRequired();
+
+            entity.HasOne(p => p.User)
+                  .WithMany()
+                  .HasForeignKey(p => p.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(p => p.BonusCard)
+                  .WithOne(b => b.Player)
+                  .HasForeignKey<BonusCard>(b => b.PlayerId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(p => p.MissionCard)
+                  .WithOne(m => m.Player)
+                  .HasForeignKey<MissionCard>(m => m.PlayerId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            // Unique: one user per game
+            entity.HasIndex(p => new { p.GameId, p.UserId }).IsUnique();
+        });
+
+        // ------------------------------------------------------------------
+        // Continent
+        // ------------------------------------------------------------------
+        builder.Entity<Continent>(entity =>
+        {
+            entity.ToTable("continents");
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Name).HasMaxLength(100).IsRequired();
+
+            entity.HasMany(c => c.Territories)
+                  .WithOne(t => t.Continent)
+                  .HasForeignKey(t => t.ContinentId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ------------------------------------------------------------------
+        // Territory
+        // ------------------------------------------------------------------
+        builder.Entity<Territory>(entity =>
+        {
+            entity.ToTable("territories");
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Identifier).HasMaxLength(100).IsRequired();
+
+            entity.HasOne(t => t.Owner)
+                  .WithMany(p => p.Territories)
+                  .HasForeignKey(t => t.OwnerId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            // Many-to-many self-referencing adjacency via TerritoryBorder
+            entity.HasMany(t => t.Neighbors)
+                  .WithMany()
+                  .UsingEntity<TerritoryBorder>(
+                      "territory_borders",
+                      r => r.HasOne(b => b.BorderingTerritory)
+                             .WithMany()
+                             .HasForeignKey(b => b.BorderingTerritoryId)
+                             .OnDelete(DeleteBehavior.Restrict),
+                      l => l.HasOne(b => b.Territory)
+                             .WithMany()
+                             .HasForeignKey(b => b.TerritoryId)
+                             .OnDelete(DeleteBehavior.Restrict),
+                      j => j.HasKey(b => new { b.TerritoryId, b.BorderingTerritoryId }));
+        });
+
+        // ------------------------------------------------------------------
+        // BonusCard
+        // ------------------------------------------------------------------
+        builder.Entity<BonusCard>(entity =>
+        {
+            entity.ToTable("bonus_cards");
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Type).HasConversion<string>().HasMaxLength(20);
+            entity.Property(b => b.TerritoryIdentifier).HasMaxLength(100);
+
+            entity.HasOne(b => b.Game)
+                  .WithMany()
+                  .HasForeignKey(b => b.GameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ------------------------------------------------------------------
+        // MissionCard
+        // ------------------------------------------------------------------
+        builder.Entity<MissionCard>(entity =>
+        {
+            entity.ToTable("mission_cards");
+            entity.HasKey(m => m.Id);
+            entity.Property(m => m.Title).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.Description).HasMaxLength(1000).IsRequired();
+
+            entity.HasOne(m => m.Game)
+                  .WithMany()
+                  .HasForeignKey(m => m.GameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }
