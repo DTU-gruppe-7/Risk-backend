@@ -1,12 +1,15 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 using Risk.Infrastructure.Repositories;
 
-namespace Risk.Api.Extensions;
+namespace Risk.Infrastructure;
 
-public static class InfrastructureServiceExtensions
+public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -25,9 +28,15 @@ public static class InfrastructureServiceExtensions
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<AppDbContext>();
 
+        // JWT token generation
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+
         // Repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IGameRepository, GameRepository>();
+        services.AddScoped<ITerritoryRepository, TerritoryRepository>();
+        services.AddScoped<IPlayerRepository, PlayerRepository>();
 
         return services;
     }
