@@ -33,10 +33,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(u => u.Id);
             entity.Property(u => u.DisplayName).HasMaxLength(200).IsRequired();
             entity.Property(u => u.Email).HasMaxLength(320).IsRequired();
+            entity.Property(u => u.CreatedAt).IsRequired();
             entity.HasIndex(u => u.Email).IsUnique();
         });
 
-        // Én login-konto hører til én domæne-bruger
         builder.Entity<ApplicationUser>()
             .HasOne<User>()
             .WithOne()
@@ -50,22 +50,36 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("games");
             entity.HasKey(g => g.Id);
-            entity.Property(g => g.State).HasConversion<string>().HasMaxLength(20);
-            entity.Property(g => g.CurrentPhase).HasConversion<string>().HasMaxLength(20);
 
+            entity.Property(g => g.State).HasConversion<string>().HasMaxLength(30).IsRequired();
+            entity.Property(g => g.CurrentPhase).HasConversion<string>().HasMaxLength(30).IsRequired();
+
+            // Explicit FK from HostId → User
+            entity.HasOne<User>()
+                  .WithMany()
+                  .HasForeignKey(g => g.HostId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            // Explicit FK from CurrentPlayerId → Player (nullable)
+            entity.HasOne<Player>()
+                  .WithMany()
+                  .HasForeignKey(g => g.CurrentPlayerId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            // Settings (one-to-one)
             entity.HasOne(g => g.Settings)
                   .WithOne(s => s.Game)
                   .HasForeignKey<GameSetting>(s => s.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
 
+            // Backing fields for IReadOnlyCollection nav properties
+            entity.Navigation(g => g.Players).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(g => g.Territories).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(g => g.Continents).UsePropertyAccessMode(PropertyAccessMode.Field);
+
             entity.HasMany(g => g.Players)
                   .WithOne(p => p.Game)
                   .HasForeignKey(p => p.GameId)
-                  .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasMany(g => g.Continents)
-                  .WithOne(c => c.Game)
-                  .HasForeignKey(c => c.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -106,6 +120,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
             // Unique: one user per game
             entity.HasIndex(p => new { p.GameId, p.UserId }).IsUnique();
+
+            // Backing field for IReadOnlyCollection
+            entity.Navigation(p => p.Territories).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            entity.HasMany(p => p.Territories)
+                  .WithOne(t => t.Owner)
+                  .HasForeignKey(t => t.OwnerId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // ------------------------------------------------------------------
@@ -116,6 +138,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.ToTable("continents");
             entity.HasKey(c => c.Id);
             entity.Property(c => c.Name).HasMaxLength(100).IsRequired();
+
+            entity.HasOne(c => c.Game)
+                  .WithMany(g => g.Continents)
+                  .HasForeignKey(c => c.GameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Navigation(c => c.Territories).UsePropertyAccessMode(PropertyAccessMode.Field);
 
             entity.HasMany(c => c.Territories)
                   .WithOne(t => t.Continent)
@@ -132,26 +161,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Identifier).HasMaxLength(100).IsRequired();
 
-            entity.HasOne(t => t.Owner)
-                  .WithMany(p => p.Territories)
-                  .HasForeignKey(t => t.OwnerId)
-                  .IsRequired(false)
-                  .OnDelete(DeleteBehavior.SetNull);
+            // Shadow property so Territory belongs to a Game (matches existing migration)
+            entity.Property<Guid>("GameId");
 
-            // Many-to-many self-referencing adjacency via TerritoryBorder
-            entity.HasMany(t => t.Neighbors)
+            entity.Navigation(t => t.Neighbors).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            entity.HasOne<Game>()
+                  .WithMany(g => g.Territories)
+                  .HasForeignKey("GameId")
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ------------------------------------------------------------------
+        // TerritoryBorder (composite-key join table)
+        // ------------------------------------------------------------------
+        builder.Entity<TerritoryBorder>(entity =>
+        {
+            entity.ToTable("territory_borders");
+            entity.HasKey(tb => new { tb.TerritoryId, tb.BorderingTerritoryId });
+
+            entity.HasOne(tb => tb.Territory)
                   .WithMany()
-                  .UsingEntity<TerritoryBorder>(
-                      "territory_borders",
-                      r => r.HasOne(b => b.BorderingTerritory)
-                             .WithMany()
-                             .HasForeignKey(b => b.BorderingTerritoryId)
-                             .OnDelete(DeleteBehavior.Restrict),
-                      l => l.HasOne(b => b.Territory)
-                             .WithMany()
-                             .HasForeignKey(b => b.TerritoryId)
-                             .OnDelete(DeleteBehavior.Restrict),
-                      j => j.HasKey(b => new { b.TerritoryId, b.BorderingTerritoryId }));
+                  .HasForeignKey(tb => tb.TerritoryId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(tb => tb.BorderingTerritory)
+                  .WithMany()
+                  .HasForeignKey(tb => tb.BorderingTerritoryId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         // ------------------------------------------------------------------

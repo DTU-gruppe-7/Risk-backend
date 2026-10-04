@@ -89,4 +89,7 @@ public sealed class Territory
     }
 
     public void Deactivate() => Active = false;
+    
+    public Guid GameId { get; private set; }
+    public Game? Game { get; private set; }
 }
