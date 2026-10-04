@@ -161,14 +161,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Identifier).HasMaxLength(100).IsRequired();
 
-            // Shadow property so Territory belongs to a Game (matches existing migration)
-            entity.Property<Guid>("GameId");
-
             entity.Navigation(t => t.Neighbors).UsePropertyAccessMode(PropertyAccessMode.Field);
 
-            entity.HasOne<Game>()
+            entity.HasOne(t => t.Game)
                   .WithMany(g => g.Territories)
-                  .HasForeignKey("GameId")
+                  .HasForeignKey(t => t.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
