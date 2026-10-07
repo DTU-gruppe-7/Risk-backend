@@ -10,6 +10,7 @@ public class GameplayService(
     IPlayerRepository playerRepository,
     ITerritoryRepository territoryRepository) : IGameplayService
 {
+    private static readonly Random _random = new();
     public async Task PlaceTroopsAsync(PlaceTroopsDto dto, CancellationToken cancellationToken = default)
     {
         if (dto.TroopCount <= 0)
@@ -92,8 +93,91 @@ public class GameplayService(
             throw new InvalidOperationException($"Action invalid for current game phase. Expected: {expectedPhase}, Actual: {game.CurrentPhase}.");
     }
     
-    public Task<AttackResultDto> AttackAsync(AttackDto dto)
+    public async Task<AttackResultDto> AttackAsync(AttackDto dto, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        if (dto.FromTerritoryId == dto.ToTerritoryId)
+            throw new InvalidOperationException("Cannot attack your own territory.");
+
+        var game = await gameRepository.GetByIdAsync(dto.GameId)
+            ?? throw new KeyNotFoundException($"Game '{dto.GameId}' not found.");
+
+        ValidateTurnAndPhase(game, dto.PlayerId, GamePhase.Attack);
+
+        var fromTerritory = await territoryRepository.GetByIdAsync(dto.FromTerritoryId)
+            ?? throw new KeyNotFoundException($"Source territory '{dto.FromTerritoryId}' not found.");
+
+        var toTerritory = await territoryRepository.GetByIdAsync(dto.ToTerritoryId)
+            ?? throw new KeyNotFoundException($"Target territory '{dto.ToTerritoryId}' not found.");
+
+        if (fromTerritory.GameId != game.Id || toTerritory.GameId != game.Id)
+            throw new InvalidOperationException("Both territories must belong to this game.");
+
+        if (fromTerritory.OwnerId != dto.PlayerId)
+            throw new InvalidOperationException("Player does not own source territory.");
+
+        if (toTerritory.OwnerId == dto.PlayerId)
+            throw new InvalidOperationException("Cannot attack your own territory.");
+
+        if (fromTerritory.TroopCount < 2)
+            throw new InvalidOperationException("Must have at least 2 troops on source territory to attack.");
+
+        if (dto.AttackingTroopsCount < 1 || dto.AttackingTroopsCount > 3)
+            throw new InvalidOperationException("Attacking troops must be between 1 and 3.");
+
+        if (dto.AttackingTroopsCount >= fromTerritory.TroopCount)
+            throw new InvalidOperationException("At least 1 troop must remain on source territory.");
+
+        var neighbors = await territoryRepository.GetNeighborsAsync(fromTerritory.Id);
+        if (!neighbors.Any(n => n.Id == toTerritory.Id))
+            throw new InvalidOperationException("Territories are not adjacent.");
+
+        // 1. Rul terninger
+        int defenderDiceCount = Math.Min(2, toTerritory.TroopCount);
+
+        var attackerDice = Enumerable.Range(0, dto.AttackingTroopsCount)
+            .Select(_ => _random.Next(1, 7))
+            .OrderByDescending(d => d)
+            .ToList();
+
+        var defenderDice = Enumerable.Range(0, defenderDiceCount)
+            .Select(_ => _random.Next(1, 7))
+            .OrderByDescending(d => d)
+            .ToList();
+
+        // 2. Sammenlign parvise terninger
+        int comparisons = Math.Min(attackerDice.Count, defenderDice.Count);
+        int attackerLosses = 0;
+        int defenderLosses = 0;
+
+        for (int i = 0; i < comparisons; i++)
+        {
+            if (attackerDice[i] > defenderDice[i])
+                defenderLosses++;
+            else
+                attackerLosses++; // Defender vinder uafgjort
+        }
+
+        fromTerritory.RemoveTroops(attackerLosses);
+        toTerritory.RemoveTroops(defenderLosses);
+
+        // 3. Erobring (Conquest)
+        bool conquered = toTerritory.TroopCount == 0;
+        if (conquered)
+        {
+            int survivingAttackingTroops = dto.AttackingTroopsCount - attackerLosses;
+            fromTerritory.RemoveTroops(survivingAttackingTroops);
+            toTerritory.Claim(dto.PlayerId, survivingAttackingTroops);
+        }
+
+        await territoryRepository.UpdateAsync(fromTerritory);
+        await territoryRepository.UpdateAsync(toTerritory);
+
+        return new AttackResultDto(
+            conquered,
+            attackerLosses,
+            defenderLosses,
+            attackerDice,
+            defenderDice
+        );
     }
 }

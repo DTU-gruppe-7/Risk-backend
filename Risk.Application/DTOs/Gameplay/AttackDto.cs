@@ -11,5 +11,7 @@ public record AttackDto(
 public record AttackResultDto(
     bool TerritoryConquered,
     int AttackerLosses,
-    int DefenderLosses
+    int DefenderLosses,
+    IReadOnlyList<int> AttackerDice,
+    IReadOnlyList<int> DefenderDice
 );
