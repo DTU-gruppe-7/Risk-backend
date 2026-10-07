@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Risk.Infrastructure;
+using Risk.Application.Interfaces.Services;
+using Risk.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,8 @@ builder.Services
 
 builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IGameplayService, GameplayService>();
 
 builder.Services.AddCors(options =>
     options.AddPolicy("frontend", policy => policy
