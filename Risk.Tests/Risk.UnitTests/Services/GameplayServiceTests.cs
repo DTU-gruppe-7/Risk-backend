@@ -103,6 +103,130 @@ public class GameplayServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Invalid troop placement amount*");
     }
+    
+    
+    // ========================================== //
+    //                ATTACK TESTS                //
+    // ========================================== //
+
+    [Fact]
+    public async Task Attack_WhenNotCurrentPlayerTurn_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Attack);
+        game.SetCurrentPlayer(Guid.NewGuid()); // En anden spillers tur
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: true);
+
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 2);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not this player's turn*");
+    }
+
+    [Fact]
+    public async Task Attack_WhenNotInAttackPhase_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Deployment);
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: true);
+
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 2);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Action invalid for current game phase*");
+    }
+
+    [Fact]
+    public async Task Attack_WhenTargetIsOwnTerritory_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Attack);
+        fromTerritory.Claim(player.Id, 4);
+        toTerritory.Claim(player.Id, 2); // Ejer allerede målet!
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: true);
+
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 2);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Cannot attack your own territory*");
+    }
+
+    [Fact]
+    public async Task Attack_WhenPlayerDoesNotOwnSourceTerritory_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Attack);
+        fromTerritory.Claim(Guid.NewGuid(), 4); // En anden spiller ejer afsenderfeltet
+        toTerritory.Claim(Guid.NewGuid(), 2);
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: true);
+
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 2);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Player does not own source territory*");
+    }
+
+    [Fact]
+    public async Task Attack_WhenTerritoriesAreNotNeighbors_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Attack);
+        fromTerritory.Claim(player.Id, 4);
+        toTerritory.Claim(Guid.NewGuid(), 2);
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: false);
+
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 2);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Territories are not adjacent*");
+    }
+
+    [Fact]
+    public async Task Attack_WhenSourceTerritoryHasLessThanTwoTroops_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Attack);
+        fromTerritory.Claim(player.Id, 1); // Kun 1 troppe (kan ikke angribe)
+        toTerritory.Claim(Guid.NewGuid(), 2);
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: true);
+
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 1);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Must have at least 2 troops on source territory to attack*");
+    }
+
+    [Fact]
+    public async Task Attack_WhenAttackingTroopsLeavesNoGarrison_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Attack);
+        fromTerritory.Claim(player.Id, 3);
+        toTerritory.Claim(Guid.NewGuid(), 2);
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: true);
+
+        // Forsøger at angribe med 3 ud af 3 tropper (efterlader 0)
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 3);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*At least 1 troop must remain on source territory*");
+    }
+
+    [Fact]
+    public async Task Attack_WhenAttackingTroopsCountIsOutOfRange_ThrowsInvalidOperationException()
+    {
+        var (game, player, fromTerritory, toTerritory) = CreateAttackSetup(GamePhase.Attack);
+        fromTerritory.Claim(player.Id, 10);
+        toTerritory.Claim(Guid.NewGuid(), 2);
+        SetupAttackRepositories(game, fromTerritory, toTerritory, areNeighbors: true);
+
+        // Risk tillader max 3 angrebstropper/terninger ad gangen
+        var dto = new AttackDto(game.Id, player.Id, fromTerritory.Id, toTerritory.Id, 4);
+        var act = () => _sut.AttackAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Attacking troops must be between 1 and 3*");
+    }
 
     // ========================================== //
     //             FORTIFY TROOPS TESTS           //
@@ -207,6 +331,24 @@ public class GameplayServiceTests
 
         return (game, player, territory);
     }
+    
+    private static (Game Game, Player Player, Territory From, Territory To) CreateAttackSetup(GamePhase phase)
+    {
+        var game = new Game(Guid.NewGuid());
+        game.Start();
+        game.SetPhase(phase);
+
+        var player = new Player(game.Id, Guid.NewGuid(), "Red", 1);
+        game.SetCurrentPlayer(player.Id);
+
+        var fromTerritory = new Territory(Guid.NewGuid(), "great-britain");
+        typeof(Territory).GetProperty("GameId")!.SetValue(fromTerritory, game.Id);
+
+        var toTerritory = new Territory(Guid.NewGuid(), "iceland");
+        typeof(Territory).GetProperty("GameId")!.SetValue(toTerritory, game.Id);
+
+        return (game, player, fromTerritory, toTerritory);
+    }
 
     private static (Game Game, Player Player, Territory From, Territory To) CreateFortifySetup()
     {
@@ -231,6 +373,16 @@ public class GameplayServiceTests
         _gameRepo.GetByIdAsync(game.Id).Returns(game);
         _playerRepo.GetByIdAsync(player.Id).Returns(player);
         _territoryRepo.GetByIdAsync(territory.Id).Returns(territory);
+    }
+    
+    private void SetupAttackRepositories(Game game, Territory from, Territory to, bool areNeighbors)
+    {
+        _gameRepo.GetByIdAsync(game.Id).Returns(game);
+        _territoryRepo.GetByIdAsync(from.Id).Returns(from);
+        _territoryRepo.GetByIdAsync(to.Id).Returns(to);
+        _territoryRepo.GetNeighborsAsync(from.Id).Returns(
+            areNeighbors ? new List<Territory> { to } : new List<Territory>()
+        );
     }
 
     private void SetupFortifyRepositories(Game game, Territory from, Territory to, bool areNeighbors)

@@ -91,4 +91,9 @@ public class GameplayService(
         if (game.CurrentPhase != expectedPhase)
             throw new InvalidOperationException($"Action invalid for current game phase. Expected: {expectedPhase}, Actual: {game.CurrentPhase}.");
     }
+    
+    public Task<AttackResultDto> AttackAsync(AttackDto dto)
+    {
+        throw new NotImplementedException();
+    }
 }
