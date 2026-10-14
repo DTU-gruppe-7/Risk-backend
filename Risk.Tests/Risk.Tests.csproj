@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="FluentAssertions" Version="7.2.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NSubstitute" Version="6.2.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Risk.Application\Risk.Application.csproj" />
     <ProjectReference Include="..\Risk.Domain\Risk.Domain.csproj" />
+    <ProjectReference Include="..\Risk.Infrastructure\Risk.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
