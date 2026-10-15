@@ -17,6 +17,7 @@ builder.Services
 
 builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddCors(options =>
     options.AddPolicy("frontend", policy => policy

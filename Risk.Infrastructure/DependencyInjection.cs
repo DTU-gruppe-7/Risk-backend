@@ -1,11 +1,14 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
+using Risk.Application.Interfaces.Services;
+using Risk.Application.Services;
 using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 using Risk.Infrastructure.Repositories;
+using Risk.Infrastructure.Services;
 
 namespace Risk.Infrastructure;
 
@@ -37,6 +40,10 @@ public static class DependencyInjection
         services.AddScoped<IGameRepository, GameRepository>();
         services.AddScoped<ITerritoryRepository, TerritoryRepository>();
         services.AddScoped<IPlayerRepository, PlayerRepository>();
+
+        // Gameplay services
+        services.AddScoped<IGameplayService, GameplayService>();
+        services.AddSingleton<IDiceRoller, DiceRoller>();
 
         return services;
     }
