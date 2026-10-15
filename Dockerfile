@@ -1,7 +1,10 @@
 ﻿# syntax=docker/dockerfile:1
 
+# Base-images er pinnet til digest (uforanderlige). Tagget står med for læsbarhed,
+# og så Dependabot kan finde og opdatere dem.
+
 # ---------- Build: restore + publish ----------
-FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS build
 WORKDIR /src
 
 # Kun projektfiler først, så restore-laget caches, indtil afhængighederne ændres
@@ -28,14 +31,17 @@ RUN dotnet ef migrations bundle \
       --output /app/efbundle
 
 # ---------- Migrator (engangs-container) ----------
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra AS migrator
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:b9f2fd17cfd23c997453e83adeaf2f2d20561f9754eb3ed5dbc97bd06867c377 AS migrator
 WORKDIR /app
+# Single-file bundles udpakker til $HOME som standard. /tmp er den eneste
+# skrivbare sti, når containeren kører read-only.
+ENV DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp
 COPY --from=bundle /app/efbundle ./efbundle
 USER $APP_UID
 ENTRYPOINT ["./efbundle"]
 
 # ---------- API (standard-target, skal stå sidst) ----------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS api
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:3ed6558056b54d5c9dfefb7ff473728e022ff2bf1d976cbf8ee07b05ec594374 AS api
 WORKDIR /app
 COPY --from=build /app/publish .
 USER $APP_UID
