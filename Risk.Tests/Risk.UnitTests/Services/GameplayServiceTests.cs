@@ -104,4 +104,97 @@ public class GameplayServiceTests
         toTerritory.TroopCount.Should().Be(2);
         toTerritory.OwnerId.Should().Be(defenderId);
     }
+    
+    [Fact]
+    public async Task BlitzAttackAsync_AttackerWins_ConquersTerritoryAndTransfersTroops()
+    {
+        // Arrange
+        var attackerId = Guid.NewGuid();
+        var defenderId = Guid.NewGuid();
+        var continentId = Guid.NewGuid();
+
+        var game = new Game(Guid.NewGuid());
+        game.Start();
+        game.SetCurrentPlayer(attackerId);
+        game.SetPhase(GamePhase.Attack);
+
+        var fromTerritory = new Territory(continentId, "North-Africa");
+        fromTerritory.Claim(attackerId, 5); // 5 tropper
+
+        var toTerritory = new Territory(continentId, "Egypt");
+        toTerritory.Claim(defenderId, 2); // 2 tropper
+
+        _gameRepository.GetByIdAsync(game.Id).Returns(game);
+        _territoryRepository.GetByIdAsync(fromTerritory.Id).Returns(fromTerritory);
+        _territoryRepository.GetByIdAsync(toTerritory.Id).Returns(toTerritory);
+        _territoryRepository.GetNeighborsAsync(fromTerritory.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { toTerritory });
+
+        // Angriber ruller altid 6'ere, forsvarer ruller altid 1'ere
+        _diceRoller.Roll(Arg.Is<int>(count => count >= 1))
+            .Returns(
+                callInfo => Enumerable.Repeat(6, callInfo.Arg<int>()).ToArray(),
+                callInfo => Enumerable.Repeat(1, callInfo.Arg<int>()).ToArray()
+            );
+
+        var dto = new BlitzAttackDto(game.Id, attackerId, fromTerritory.Id, toTerritory.Id);
+
+        // Act
+        var result = await _sut.BlitzAttackAsync(dto);
+
+        // Assert
+        result.TerritoryConquered.Should().BeTrue();
+        result.TotalDefenderLosses.Should().Be(2);
+        result.TotalAttackerLosses.Should().Be(0);
+        toTerritory.OwnerId.Should().Be(attackerId);
+        fromTerritory.TroopCount.Should().Be(1);
+        toTerritory.TroopCount.Should().Be(4);
+        await _territoryRepository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task BlitzAttackAsync_AttackerLoses_StopsWhenOriginatingTerritoryHasOneTroop()
+    {
+        // Arrange
+        var attackerId = Guid.NewGuid();
+        var defenderId = Guid.NewGuid();
+        var continentId = Guid.NewGuid();
+
+        var game = new Game(Guid.NewGuid());
+        game.Start();
+        game.SetCurrentPlayer(attackerId);
+        game.SetPhase(GamePhase.Attack);
+
+        var fromTerritory = new Territory(continentId, "Western-Europe");
+        fromTerritory.Claim(attackerId, 3); // 3 tropper (kan angribe ned til 1)
+
+        var toTerritory = new Territory(continentId, "Southern-Europe");
+        toTerritory.Claim(defenderId, 4); // 4 tropper
+
+        _gameRepository.GetByIdAsync(game.Id).Returns(game);
+        _territoryRepository.GetByIdAsync(fromTerritory.Id).Returns(fromTerritory);
+        _territoryRepository.GetByIdAsync(toTerritory.Id).Returns(toTerritory);
+        _territoryRepository.GetNeighborsAsync(fromTerritory.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { toTerritory });
+
+        // Angriber ruller altid 1'ere, forsvarer ruller altid 6'ere (forsvarer vinder alle runder)
+        _diceRoller.Roll(Arg.Is<int>(count => count >= 1))
+            .Returns(
+                callInfo => Enumerable.Repeat(1, callInfo.Arg<int>()).ToArray(),
+                callInfo => Enumerable.Repeat(6, callInfo.Arg<int>()).ToArray()
+            );
+
+        var dto = new BlitzAttackDto(game.Id, attackerId, fromTerritory.Id, toTerritory.Id);
+
+        // Act
+        var result = await _sut.BlitzAttackAsync(dto);
+
+        // Assert
+        result.TerritoryConquered.Should().BeFalse();
+        result.RemainingAttackingTerritoryTroops.Should().Be(1);
+        fromTerritory.TroopCount.Should().Be(1);
+        toTerritory.OwnerId.Should().Be(defenderId);
+        await _territoryRepository.Received(1).SaveChangesAsync();
+    }
 }
+
