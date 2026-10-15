@@ -60,3 +60,6 @@ dotnet run --project Risk.Api
   `dotnet ef migrations add <MigrationName> --project Risk.Infrastructure --startup-project Risk.Api`
 * Update database:
   `dotnet ef database update --project Risk.Infrastructure --startup-project Risk.Api`
+
+* Check if a migration is needed:
+  `dotnet ef migrations has-pending-model-changes --project Risk.Infrastructure --startup-project Risk.Api`

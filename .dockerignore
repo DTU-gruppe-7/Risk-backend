@@ -42,3 +42,11 @@
 # OS metadata
 **/.DS_Store
 **/Thumbs.db
+
+# Ikke nødvendigt i imaget
+**/Risk.Tests/
+**/openapi.json
+**/Dockerfile*
+**/.dockerignore
+**/docker-compose*.yml
+**/*.md

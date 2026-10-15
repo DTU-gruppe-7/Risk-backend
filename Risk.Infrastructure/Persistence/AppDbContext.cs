@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Risk.Domain.Entities;
@@ -6,8 +7,9 @@ using Risk.Infrastructure.Identity;
 namespace Risk.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options), IDataProtectionKeyContext
 {
+      public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     // Bemærk navnet: IdentityDbContext har allerede en Users-property til
     // ApplicationUser, så domæne-brugerne får deres eget navn.
     public DbSet<User> DomainUsers           => Set<User>();
@@ -22,7 +24,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(builder);
+      base.OnModelCreating(builder);
+
+      builder.Entity<DataProtectionKey>().ToTable("data_protection_keys");
+
 
         // ------------------------------------------------------------------
         // User
@@ -161,15 +166,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Identifier).HasMaxLength(100).IsRequired();
 
-            // Shadow property so Territory belongs to a Game (matches existing migration)
-            entity.Property<Guid>("GameId");
-
             entity.Navigation(t => t.Neighbors).UsePropertyAccessMode(PropertyAccessMode.Field);
 
-            entity.HasOne<Game>()
+            entity.HasOne(t => t.Game)
                   .WithMany(g => g.Territories)
-                  .HasForeignKey("GameId")
+                  .HasForeignKey(t => t.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
+
         });
 
         // ------------------------------------------------------------------

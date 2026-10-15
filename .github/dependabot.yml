@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      # EF Core-pakker og dotnet-ef-værktøjet skal altid have samme version
+      efcore:
+        patterns: ["Microsoft.EntityFrameworkCore*", "Npgsql.EntityFrameworkCore*", "dotnet-ef"]
+      aspnetcore:
+        patterns: ["Microsoft.AspNetCore*", "Microsoft.Extensions*"]
+      tests:
+        patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*", "Testcontainers*"]
+
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
