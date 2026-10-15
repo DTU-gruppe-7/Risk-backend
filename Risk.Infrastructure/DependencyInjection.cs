@@ -6,6 +6,7 @@ using Risk.Application.Interfaces.Repository;
 using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 using Risk.Infrastructure.Repositories;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Risk.Infrastructure;
 
@@ -27,6 +28,12 @@ public static class DependencyInjection
             })
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<AppDbContext>();
+        
+        // DataProtection-nøgler i databasen, så de overlever deploys og virker med read-only containere
+        services.AddDataProtection()
+            .SetApplicationName("Risk")
+            .PersistKeysToDbContext<AppDbContext>();
+
 
         // JWT token generation
         services.AddScoped<IJwtTokenService, JwtTokenService>();

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Risk.Domain.Entities;
@@ -6,8 +7,9 @@ using Risk.Infrastructure.Identity;
 namespace Risk.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options), IDataProtectionKeyContext
 {
+      public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     // Bemærk navnet: IdentityDbContext har allerede en Users-property til
     // ApplicationUser, så domæne-brugerne får deres eget navn.
     public DbSet<User> DomainUsers           => Set<User>();
@@ -22,7 +24,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(builder);
+      base.OnModelCreating(builder);
+
+      builder.Entity<DataProtectionKey>().ToTable("data_protection_keys");
+
 
         // ------------------------------------------------------------------
         // User

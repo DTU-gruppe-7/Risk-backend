@@ -11,6 +11,10 @@ using Risk.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// I drift mountes secrets som filer i /run/secrets (Docker Compose secrets).
+// Filnavnet er nøglen: "Jwt__Key" bliver til Jwt:Key. Mappen findes ikke lokalt, så den er valgfri.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 // Enums serialiseres som strenge. Uden dette bliver de til rå tal i
 // OpenAPI-dokumentet, og frontendens genererede typer bliver "number".
 builder.Services
