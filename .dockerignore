@@ -1,0 +1,52 @@
+﻿# Git og versionsstyring
+**/.git
+**/.gitignore
+
+# Hemmeligheder, nøgler og lokale indstillinger
+**/.env
+**/.env.*
+!**/.env.example
+**/secrets.json
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/*.pfx
+**/*.p12
+**/*.key
+**/devcert.pem
+**/setup-dev-secrets.ps1
+
+# Build output og midlertidige filer
+**/bin/
+**/obj/
+**/out/
+**/publish/
+**/artifacts/
+**/[Dd]ebug/
+**/[Rr]elease/
+
+# Test resultater og dækning
+**/TestResults/
+**/coverage/
+**/*.trx
+**/*.coverage
+
+# IDE og editor filer
+**/.idea/
+**/.vs/
+**/.vscode/
+**/*.user
+**/*.suo
+**/*.swp
+*~
+
+# OS metadata
+**/.DS_Store
+**/Thumbs.db
+
+# Ikke nødvendigt i imaget
+**/Risk.Tests/
+**/openapi.json
+**/Dockerfile*
+**/.dockerignore
+**/docker-compose*.yml
+**/*.md

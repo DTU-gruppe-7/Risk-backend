@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    name: Build og test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet tool restore
+      - run: dotnet restore Risk.slnx
+      - run: dotnet build Risk.slnx --no-restore -c Release
+      # Testcontainers virker direkte på GitHubs Ubuntu-runners (Docker er installeret)
+      - run: dotnet test Risk.slnx --no-build -c Release
+
+      - name: Tjek for manglende migrationer
+        run: >
+          dotnet ef migrations has-pending-model-changes
+          --project Risk.Infrastructure --startup-project Risk.Api
+          --configuration Release --no-build
+
+      - name: Kodestil (kun advarsel indtil videre)
+        continue-on-error: true
+        run: dotnet format Risk.slnx --verify-no-changes --no-restore
+
+  smoke-test:
+    name: Docker smoke-test
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CONN: Host=db;Port=5432;Database=risk;Username=ci;Password=ci;GSS Encryption Mode=Disable
+      # Samme hærdning som på serveren, så read-only-problemer fanges her
+      HARDENING: --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Byg migrator
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          target: migrator
+          tags: risk-migrator:ci
+          load: true
+          cache-from: type=gha,scope=migrator
+          cache-to: type=gha,mode=max,scope=migrator
+
+      - name: Byg API
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          target: api
+          tags: risk-api:ci
+          load: true
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Tjek image-egenskaber
+        run: |
+          test "$(docker image inspect risk-api:ci --format '{{.Config.User}}')" = "1654"
+          test "$(docker image inspect risk-migrator:ci --format '{{.Config.User}}')" = "1654"
+          ! docker run --rm --entrypoint sh risk-api:ci -c true 2>/dev/null
+
+      - name: Start Postgres
+        run: |
+          docker network create ci
+          docker run -d --name db --network ci \
+            -e POSTGRES_USER=ci -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=risk postgres:17-alpine
+          for i in $(seq 1 30); do docker exec db pg_isready -U ci -d risk && exit 0; sleep 1; done
+          exit 1
+
+      - name: Kør migrationer to gange (idempotens)
+        run: |
+          for run in 1 2; do
+            docker run --rm --network ci $HARDENING \
+              -e DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp \
+              -e ConnectionStrings__Default="$CONN" risk-migrator:ci
+          done
+
+      - name: Start API og vent på /readyz
+        run: |
+          docker run -d --name api --network ci -p 8080:8080 $HARDENING \
+            -e ASPNETCORE_ENVIRONMENT=Production \
+            -e ConnectionStrings__Default="$CONN" \
+            -e Jwt__Key="$(openssl rand -base64 48)" \
+            -e Jwt__Issuer=ci -e Jwt__Audience=ci \
+            risk-api:ci
+          for i in $(seq 1 30); do curl -fsS http://localhost:8080/readyz && exit 0; sleep 1; done
+          exit 1
+
+      - name: Container-logs ved fejl
+        if: failure()
+        run: |
+          docker logs db  || true
+          docker logs api || true
+
+      - name: Trivy-scan af API
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: risk-api:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Trivy-scan af migrator
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: risk-migrator:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
