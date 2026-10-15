@@ -1,10 +1,13 @@
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
-using System.Reflection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Risk.Infrastructure;
+using Risk.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +21,7 @@ builder.Services
 builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Kun til lokal udvikling. I drift serveres frontend og API fra samme origin via Caddy.
 builder.Services.AddCors(options =>
     options.AddPolicy("frontend", policy => policy
         .WithOrigins("http://localhost:5173")
@@ -25,22 +29,36 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod()
         .AllowCredentials()));
 
-// Både "dotnet build" (OpenAPI-generering) og "dotnet ef" bygger host'en uden
-// at starte den. De kører som Production og indlæser derfor ikke user-secrets.
-// Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
+// Bag Caddy: stol kun på X-Forwarded-* fra proxy-netværket (sættes i compose).
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    var proxyNetwork = builder.Configuration["ReverseProxy:Network"];
+    if (!string.IsNullOrWhiteSpace(proxyNetwork))
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(proxyNetwork));
+});
+
+// /healthz = processen kører, /readyz = processen kan nå databasen.
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
+
+// Både "dotnet build" (OpenAPI-generering), "dotnet ef" og migration bundles bygger
+// host'en uden at starte den. Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
 var isDesignTime = Assembly.GetEntryAssembly() != Assembly.GetExecutingAssembly();
 
 var signingKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(signingKey))
-{
-    if (!isDesignTime)
-    {
-        throw new InvalidOperationException(
-            "Jwt:Key mangler. Kør .\\setup-dev-secrets.ps1 lokalt, " +
-            "eller sæt miljøvariablen Jwt__Key i drift.");
-    }
+var issuer = builder.Configuration["Jwt:Issuer"];
+var audience = builder.Configuration["Jwt:Audience"];
 
-    signingKey = "design-time-placeholder-bruges-aldrig-til-rigtige-tokens";
+if (isDesignTime)
+{
+    signingKey ??= "design-time-placeholder-bruges-aldrig-til-rigtige-tokens";
+}
+else if (string.IsNullOrWhiteSpace(signingKey) || string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience))
+{
+    throw new InvalidOperationException(
+        "Jwt:Key, Jwt:Issuer og Jwt:Audience skal være sat. Kør .\\setup-dev-secrets.ps1 lokalt, " +
+        "eller sæt Jwt__Key, Jwt__Issuer og Jwt__Audience i drift.");
 }
 
 builder.Services
@@ -50,9 +68,9 @@ builder.Services
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidIssuer = issuer,
             ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidAudience = audience,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
             ValidateLifetime = true,
@@ -64,16 +82,20 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();                 // dokumentet på /openapi/v1.json
     app.MapScalarApiReference();      // brugerfladen på /scalar/v1
+    app.UseCors("frontend");
 }
 
-app.UseHttpsRedirection();
-app.UseCors("frontend");
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHealthChecks("/healthz", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapControllers();
 
 app.Run();

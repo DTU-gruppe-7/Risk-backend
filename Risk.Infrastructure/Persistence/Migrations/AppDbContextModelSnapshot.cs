@@ -138,10 +138,13 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("TerritoryIdentifier")
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("Used")
                         .HasColumnType("boolean");
@@ -249,7 +252,7 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.HasIndex("GameId")
                         .IsUnique();
 
-                    b.ToTable("GameSetting");
+                    b.ToTable("game_settings", (string)null);
                 });
 
             modelBuilder.Entity("Risk.Domain.Entities.MissionCard", b =>
@@ -260,7 +263,8 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<Guid>("GameId")
                         .HasColumnType("uuid");
@@ -273,7 +277,8 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
@@ -339,9 +344,6 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("GameId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("GameId1")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Identifier")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -361,8 +363,6 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.HasIndex("ContinentId");
 
                     b.HasIndex("GameId");
-
-                    b.HasIndex("GameId1");
 
                     b.HasIndex("OwnerId");
 
@@ -572,7 +572,8 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.HasOne("Risk.Domain.Entities.Player", "Player")
                         .WithOne("BonusCard")
-                        .HasForeignKey("Risk.Domain.Entities.BonusCard", "PlayerId");
+                        .HasForeignKey("Risk.Domain.Entities.BonusCard", "PlayerId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Game");
 
@@ -625,7 +626,8 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.HasOne("Risk.Domain.Entities.Player", "Player")
                         .WithOne("MissionCard")
-                        .HasForeignKey("Risk.Domain.Entities.MissionCard", "PlayerId");
+                        .HasForeignKey("Risk.Domain.Entities.MissionCard", "PlayerId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Game");
 
@@ -659,15 +661,11 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Risk.Domain.Entities.Game", null)
+                    b.HasOne("Risk.Domain.Entities.Game", "Game")
                         .WithMany("Territories")
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("Risk.Domain.Entities.Game", "Game")
-                        .WithMany()
-                        .HasForeignKey("GameId1");
 
                     b.HasOne("Risk.Domain.Entities.Player", "Owner")
                         .WithMany("Territories")
