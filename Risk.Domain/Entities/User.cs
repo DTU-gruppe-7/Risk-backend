@@ -1,3 +1,5 @@
+using Risk.Domain.Exceptions;
+
 namespace Risk.Domain.Entities;
 
 /// <summary>
@@ -7,29 +9,30 @@ namespace Risk.Domain.Entities;
 public sealed class User
 {
     public Guid Id { get; private set; } = Guid.CreateVersion7();
-    public string DisplayName { get; private set; } = string.Empty;
+    public string Username { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;
 
     // EF Core kræver en parameterløs konstruktør
     private User() { }
 
-    public User(string displayName, string email)
+    public User(string username, string email)
     {
-        if (string.IsNullOrWhiteSpace(displayName))
-            throw new ArgumentException("Navn må ikke være tomt.", nameof(displayName));
         if (string.IsNullOrWhiteSpace(email))
-            throw new ArgumentException("Email må ikke være tom.", nameof(email));
+            throw new DomainValidationException("Email må ikke være tom.");
 
-        DisplayName = displayName.Trim();
-        Email = email.Trim().ToLowerInvariant();
+        Rename(username);
+        Email = NormalizeEmail(email);
     }
 
-    public void Rename(string displayName)
+    public void Rename(string username)
     {
-        if (string.IsNullOrWhiteSpace(displayName))
-            throw new ArgumentException("Navn må ikke være tomt.", nameof(displayName));
+        if (string.IsNullOrWhiteSpace(username))
+            throw new DomainValidationException("Navn må ikke være tomt.");
 
-        DisplayName = displayName.Trim();
+        Username = username.Trim();
     }
+
+    /// <summary>Emails gemmes altid i samme form, så opslag og unik-index er case-insensitive.</summary>
+    public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 }

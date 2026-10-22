@@ -293,7 +293,27 @@
             }
           },
           "400": {
-            "description": "Card already used or domain rule violated.",
+            "description": "The player is not part of this game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not part of the game.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -314,6 +334,26 @@
           },
           "404": {
             "description": "Card not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Card already used.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -382,8 +422,8 @@
               }
             }
           },
-          "400": {
-            "description": "Card already used.",
+          "403": {
+            "description": "Caller is not part of the game.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -421,129 +461,9 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/games/{gameId}/continents": {
-      "get": {
-        "tags": [
-          "Continents"
-        ],
-        "summary": "Lists all continents in a game.",
-        "parameters": [
-          {
-            "name": "gameId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Continents returned.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ContinentSummaryResponse"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ContinentSummaryResponse"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ContinentSummaryResponse"
-                  }
-                }
-              }
-            }
           },
-          "404": {
-            "description": "Game not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/games/{gameId}/continents/{id}": {
-      "get": {
-        "tags": [
-          "Continents"
-        ],
-        "summary": "Returns a continent with its territory IDs.",
-        "parameters": [
-          {
-            "name": "gameId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Continent returned.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ContinentDetailResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ContinentDetailResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ContinentDetailResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Continent not found.",
+          "409": {
+            "description": "Card already used.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -655,6 +575,26 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GameDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -983,8 +923,48 @@
               }
             }
           },
+          "403": {
+            "description": "Caller is not part of the game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Game not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Game is not in progress.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1064,8 +1044,68 @@
               }
             }
           },
+          "400": {
+            "description": "The player is not part of this game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not part of the game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Game not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Game is not in progress, or the player is eliminated.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1151,7 +1191,7 @@
         "tags": [
           "Games"
         ],
-        "summary": "Updates game settings. Only allowed while in Lobby state.",
+        "summary": "Updates game settings. Only allowed for the host while in Lobby state.",
         "parameters": [
           {
             "name": "id",
@@ -1200,6 +1240,26 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GameSettingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1267,27 +1327,47 @@
         }
       }
     },
+    "/api/map": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "summary": "Returns the whole board. Never changes at runtime, so clients may cache it.",
+        "responses": {
+          "200": {
+            "description": "Board returned.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/games/{gameId}/mission-cards": {
       "get": {
         "tags": [
           "MissionCards"
         ],
-        "summary": "Lists mission cards in a game. When playerId is provided\nonly that player's card is returned (used for the player to read their own mission).",
+        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\r\nso other players' cards are never returned.",
         "parameters": [
           {
             "name": "gameId",
             "in": "path",
-            "description": "Game ID.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "playerId",
-            "in": "query",
-            "description": "Optional: filter to a specific player's mission.",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1320,6 +1400,26 @@
                   "items": {
                     "$ref": "#/components/schemas/MissionCardResponse"
                   }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not part of the game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1415,7 +1515,27 @@
             }
           },
           "400": {
-            "description": "Mission already assigned or domain rule violated.",
+            "description": "The player is not part of this game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not part of the game.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1436,6 +1556,26 @@
           },
           "404": {
             "description": "Mission card not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Mission already assigned.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1504,8 +1644,8 @@
               }
             }
           },
-          "400": {
-            "description": "Mission not assigned or already completed.",
+          "403": {
+            "description": "Caller is not part of the game.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1526,6 +1666,26 @@
           },
           "404": {
             "description": "Mission card not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Mission not assigned or already completed.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1704,7 +1864,7 @@
             }
           },
           "400": {
-            "description": "Already in game or game is full.",
+            "description": "Invalid colour.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1744,7 +1904,7 @@
             }
           },
           "409": {
-            "description": "Game is not in Lobby state.",
+            "description": "Game has started, is full, or the caller is already in it.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1974,6 +2134,26 @@
               }
             }
           },
+          "403": {
+            "description": "Caller is not part of the game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Player not found.",
             "content": {
@@ -2064,6 +2244,46 @@
               }
             }
           },
+          "400": {
+            "description": "Troops must be positive.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not part of the game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Player not found.",
             "content": {
@@ -2092,7 +2312,7 @@
         "tags": [
           "Territories"
         ],
-        "summary": "Lists all active territories in a game, optionally filtered by owner.",
+        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\r\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
         "parameters": [
           {
             "name": "gameId",
@@ -2172,7 +2392,7 @@
         "tags": [
           "Territories"
         ],
-        "summary": "Returns a single territory including its neighbouring territory IDs.",
+        "summary": "Returns a single territory's state.",
         "parameters": [
           {
             "name": "gameId",
@@ -2199,17 +2419,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/TerritoryDetailResponse"
+                  "$ref": "#/components/schemas/TerritoryResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TerritoryDetailResponse"
+                  "$ref": "#/components/schemas/TerritoryResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TerritoryDetailResponse"
+                  "$ref": "#/components/schemas/TerritoryResponse"
                 }
               }
             }
@@ -2305,7 +2525,27 @@
             }
           },
           "400": {
-            "description": "Domain rule violation (e.g. already occupied).",
+            "description": "Invalid troop count, or the player is not in this game.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not part of the game.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2326,6 +2566,26 @@
           },
           "404": {
             "description": "Territory not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Territory is already occupied, or a blizzard.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2414,8 +2674,8 @@
               }
             }
           },
-          "400": {
-            "description": "Domain rule violation (e.g. removing more troops than present).",
+          "403": {
+            "description": "Caller is not part of the game.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2436,6 +2696,26 @@
           },
           "404": {
             "description": "Territory not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Removing more troops than present, or adding to a blizzard.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2510,7 +2790,7 @@
         "tags": [
           "Users"
         ],
-        "summary": "Updates the authenticated user's display name.",
+        "summary": "Updates the authenticated user's name.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2552,6 +2832,26 @@
               }
             }
           },
+          "400": {
+            "description": "Name is empty.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "User not found.",
             "content": {
@@ -2586,11 +2886,9 @@
         "properties": {
           "playerId": {
             "type": "string",
-            "description": "Player receiving the card.",
             "format": "uuid"
           }
-        },
-        "description": "Payload to assign a card to a player."
+        }
       },
       "AssignMissionRequest": {
         "required": [
@@ -2600,40 +2898,44 @@
         "properties": {
           "playerId": {
             "type": "string",
-            "description": "Player who receives this mission.",
             "format": "uuid"
           }
-        },
-        "description": "Payload to assign a mission card to a player."
+        }
       },
       "AuthResponse": {
         "required": [
-          "userId",
-          "displayName",
-          "email",
-          "token"
+          "accessToken",
+          "user"
         ],
         "type": "object",
         "properties": {
-          "userId": {
+          "accessToken": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserResponse"
+          }
+        }
+      },
+      "AuthUserResponse": {
+        "required": [
+          "id",
+          "userName",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
             "type": "string",
-            "description": "The stable domain user ID.",
             "format": "uuid"
           },
-          "displayName": {
-            "type": "string",
-            "description": "Publicly visible in-game name."
+          "userName": {
+            "type": "string"
           },
           "email": {
-            "type": "string",
-            "description": "The user's email address."
-          },
-          "token": {
-            "type": "string",
-            "description": "Signed JWT — include as `Authorization: Bearer {token}` on subsequent requests."
+            "type": "string"
           }
-        },
-        "description": "Returned after a successful register or login."
+        }
       },
       "BonusCardResponse": {
         "required": [
@@ -2648,12 +2950,10 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Card ID.",
             "format": "uuid"
           },
           "gameId": {
             "type": "string",
-            "description": "Owning game.",
             "format": "uuid"
           },
           "playerId": {
@@ -2661,26 +2961,21 @@
               "null",
               "string"
             ],
-            "description": "Holder player ID, or null if in draw pile.",
             "format": "uuid"
           },
           "type": {
-            "description": "Card symbol type.",
             "$ref": "#/components/schemas/BonusCardType"
           },
           "territoryIdentifier": {
             "type": [
               "null",
               "string"
-            ],
-            "description": "Depicted territory slug, or null for Wild cards."
+            ]
           },
           "used": {
-            "type": "boolean",
-            "description": "Whether the card has been traded in."
+            "type": "boolean"
           }
-        },
-        "description": "A Risk territory / bonus card."
+        }
       },
       "BonusCardType": {
         "type": "integer"
@@ -2693,7 +2988,6 @@
         "properties": {
           "playerId": {
             "type": "string",
-            "description": "Player claiming the territory.",
             "format": "uuid"
           },
           "initialTroops": {
@@ -2702,101 +2996,10 @@
               "integer",
               "string"
             ],
-            "description": "Troops to place on claim (minimum 1).",
             "format": "int32",
             "default": 1
           }
-        },
-        "description": "Payload to claim a territory for a player."
-      },
-      "ContinentDetailResponse": {
-        "required": [
-          "id",
-          "gameId",
-          "name",
-          "captureBonus",
-          "territoryIds"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Continent ID.",
-            "format": "uuid"
-          },
-          "gameId": {
-            "type": "string",
-            "description": "Owning game.",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "description": "Continent name."
-          },
-          "captureBonus": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "description": "Bonus troops for controlling all territories.",
-            "format": "int32"
-          },
-          "territoryIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "IDs of territories belonging to this continent."
-          }
-        },
-        "description": "Full continent detail including territory IDs."
-      },
-      "ContinentSummaryResponse": {
-        "required": [
-          "id",
-          "gameId",
-          "name",
-          "captureBonus",
-          "territoryCount"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Continent ID.",
-            "format": "uuid"
-          },
-          "gameId": {
-            "type": "string",
-            "description": "Owning game.",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "description": "Continent name."
-          },
-          "captureBonus": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "description": "Bonus troops for controlling all territories.",
-            "format": "int32"
-          },
-          "territoryCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "description": "Number of territories in this continent.",
-            "format": "int32"
-          }
-        },
-        "description": "Lightweight continent for list views."
+        }
       },
       "CreateGameRequest": {
         "required": [
@@ -2815,7 +3018,6 @@
               "integer",
               "string"
             ],
-            "description": "2–6. Default: 6.",
             "format": "int32"
           },
           "timer": {
@@ -2825,7 +3027,6 @@
               "integer",
               "string"
             ],
-            "description": "Total game time limit in seconds. 0 = unlimited.",
             "format": "int32"
           },
           "turnTimeLimit": {
@@ -2835,29 +3036,35 @@
               "integer",
               "string"
             ],
-            "description": "Per-turn time limit in seconds. 0 = unlimited.",
             "format": "int32"
           },
           "hasFogOfWar": {
             "type": [
               "null",
               "boolean"
-            ],
-            "description": "Enable fog-of-war. Default: false."
+            ]
           },
           "hasMissions": {
             "type": [
               "null",
               "boolean"
+            ]
+          },
+          "blizzardCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
             ],
-            "description": "Enable secret mission cards. Default: false."
+            "format": "int32"
           }
-        },
-        "description": "Payload to create a new game. All fields are optional; defaults apply."
+        }
       },
       "GameDetailResponse": {
         "required": [
           "id",
+          "version",
           "hostId",
           "state",
           "currentPlayerId",
@@ -2872,16 +3079,21 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Game ID.",
             "format": "uuid"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           },
           "hostId": {
             "type": "string",
-            "description": "Domain user ID of the host.",
             "format": "uuid"
           },
           "state": {
-            "description": "Current game state.",
             "$ref": "#/components/schemas/GameState"
           },
           "currentPlayerId": {
@@ -2889,11 +3101,9 @@
               "null",
               "string"
             ],
-            "description": "Player whose turn it is (null if not started).",
             "format": "uuid"
           },
           "currentPhase": {
-            "description": "Current turn phase.",
             "$ref": "#/components/schemas/GamePhase"
           },
           "settings": {
@@ -2902,7 +3112,6 @@
                 "type": "null"
               },
               {
-                "description": "Game settings snapshot.",
                 "$ref": "#/components/schemas/GameSettingResponse"
               }
             ]
@@ -2911,12 +3120,10 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PlayerSummaryResponse"
-            },
-            "description": "Participating players."
+            }
           },
           "createdAt": {
             "type": "string",
-            "description": "When the game was created.",
             "format": "date-time"
           },
           "startedAt": {
@@ -2924,7 +3131,6 @@
               "null",
               "string"
             ],
-            "description": "When the game started (null if not yet started).",
             "format": "date-time"
           },
           "endedAt": {
@@ -2932,11 +3138,9 @@
               "null",
               "string"
             ],
-            "description": "When the game ended (null if not finished).",
             "format": "date-time"
           }
-        },
-        "description": "Full game details including settings and players."
+        }
       },
       "GamePhase": {
         "type": "integer"
@@ -2949,7 +3153,8 @@
           "timer",
           "turnTimeLimit",
           "hasFogOfWar",
-          "hasMissions"
+          "hasMissions",
+          "blizzardCount"
         ],
         "type": "object",
         "properties": {
@@ -2990,9 +3195,16 @@
           },
           "hasMissions": {
             "type": "boolean"
+          },
+          "blizzardCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
-        },
-        "description": "Game configuration snapshot."
+        }
       },
       "GameState": {
         "type": "integer"
@@ -3010,16 +3222,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Game ID.",
             "format": "uuid"
           },
           "hostId": {
             "type": "string",
-            "description": "Domain user ID of the host.",
             "format": "uuid"
           },
           "state": {
-            "description": "Current game state.",
             "$ref": "#/components/schemas/GameState"
           },
           "playerCount": {
@@ -3028,7 +3237,6 @@
               "integer",
               "string"
             ],
-            "description": "Number of players currently in the game.",
             "format": "int32"
           },
           "maxPlayers": {
@@ -3037,16 +3245,13 @@
               "integer",
               "string"
             ],
-            "description": "Maximum players allowed (from settings).",
             "format": "int32"
           },
           "createdAt": {
             "type": "string",
-            "description": "When the game was created.",
             "format": "date-time"
           }
-        },
-        "description": "Lightweight game summary for list views."
+        }
       },
       "JoinGameRequest": {
         "required": [
@@ -3055,11 +3260,9 @@
         "type": "object",
         "properties": {
           "color": {
-            "type": "string",
-            "description": "Requested board colour (e.g. \"red\", \"blue\")."
+            "type": "string"
           }
-        },
-        "description": "Payload to join a game."
+        }
       },
       "LoginRequest": {
         "required": [
@@ -3074,8 +3277,74 @@
           "password": {
             "type": "string"
           }
-        },
-        "description": "Payload required to authenticate."
+        }
+      },
+      "MapContinentResponse": {
+        "required": [
+          "id",
+          "name",
+          "captureBonus"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "captureBonus": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "MapResponse": {
+        "required": [
+          "continents",
+          "territories"
+        ],
+        "type": "object",
+        "properties": {
+          "continents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MapContinentResponse"
+            }
+          },
+          "territories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MapTerritoryResponse"
+            }
+          }
+        }
+      },
+      "MapTerritoryResponse": {
+        "required": [
+          "id",
+          "continentId",
+          "neighborIds"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "continentId": {
+            "type": "string"
+          },
+          "neighborIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "MissionCardResponse": {
         "required": [
@@ -3090,12 +3359,10 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Card ID.",
             "format": "uuid"
           },
           "gameId": {
             "type": "string",
-            "description": "Owning game.",
             "format": "uuid"
           },
           "playerId": {
@@ -3103,23 +3370,18 @@
               "null",
               "string"
             ],
-            "description": "Assigned player ID, or null if unassigned.",
             "format": "uuid"
           },
           "title": {
-            "type": "string",
-            "description": "Short mission title."
+            "type": "string"
           },
           "description": {
-            "type": "string",
-            "description": "Full victory condition."
+            "type": "string"
           },
           "isCompleted": {
-            "type": "boolean",
-            "description": "Whether the mission has been completed."
+            "type": "boolean"
           }
-        },
-        "description": "A mission card."
+        }
       },
       "PingResponse": {
         "required": [
@@ -3152,22 +3414,18 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Player ID.",
             "format": "uuid"
           },
           "gameId": {
             "type": "string",
-            "description": "The game this player belongs to.",
             "format": "uuid"
           },
           "userId": {
             "type": "string",
-            "description": "Domain user ID.",
             "format": "uuid"
           },
           "color": {
-            "type": "string",
-            "description": "Board colour."
+            "type": "string"
           },
           "reinforcementTroops": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -3175,12 +3433,10 @@
               "integer",
               "string"
             ],
-            "description": "Troops available to place.",
             "format": "int32"
           },
           "isEliminated": {
-            "type": "boolean",
-            "description": "Whether the player has been eliminated."
+            "type": "boolean"
           },
           "turnOrder": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -3188,16 +3444,13 @@
               "integer",
               "string"
             ],
-            "description": "1-indexed turn order.",
             "format": "int32"
           },
           "joinedAt": {
             "type": "string",
-            "description": "When the player joined.",
             "format": "date-time"
           }
-        },
-        "description": "Full player details."
+        }
       },
       "PlayerSummaryResponse": {
         "required": [
@@ -3231,8 +3484,7 @@
           "isEliminated": {
             "type": "boolean"
           }
-        },
-        "description": "Lightweight player summary embedded in game responses."
+        }
       },
       "ProblemDetails": {
         "type": "object",
@@ -3274,26 +3526,22 @@
       },
       "RegisterRequest": {
         "required": [
-          "displayName",
+          "userName",
           "email",
           "password"
         ],
         "type": "object",
         "properties": {
-          "displayName": {
-            "type": "string",
-            "description": "Publicly visible name shown in-game."
+          "userName": {
+            "type": "string"
           },
           "email": {
-            "type": "string",
-            "description": "Email address used for login."
+            "type": "string"
           },
           "password": {
-            "type": "string",
-            "description": "Must satisfy the configured password policy (min 12 chars)."
+            "type": "string"
           }
-        },
-        "description": "Payload required to create a new account."
+        }
       },
       "ReinforceRequest": {
         "required": [
@@ -3307,11 +3555,9 @@
               "integer",
               "string"
             ],
-            "description": "Number of troops to add (must be positive).",
             "format": "int32"
           }
-        },
-        "description": "Payload to add reinforcement troops to a player."
+        }
       },
       "SetCurrentPlayerRequest": {
         "required": [
@@ -3321,11 +3567,9 @@
         "properties": {
           "playerId": {
             "type": "string",
-            "description": "ID of the player whose turn it now is.",
             "format": "uuid"
           }
-        },
-        "description": "Payload to set the active player."
+        }
       },
       "SetPhaseRequest": {
         "required": [
@@ -3334,101 +3578,32 @@
         "type": "object",
         "properties": {
           "phase": {
-            "description": "New phase.",
             "$ref": "#/components/schemas/GamePhase"
           }
-        },
-        "description": "Payload to change the current game phase."
-      },
-      "TerritoryDetailResponse": {
-        "required": [
-          "id",
-          "continentId",
-          "identifier",
-          "ownerId",
-          "troopCount",
-          "active",
-          "neighborIds"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Territory ID.",
-            "format": "uuid"
-          },
-          "continentId": {
-            "type": "string",
-            "description": "Owning continent.",
-            "format": "uuid"
-          },
-          "identifier": {
-            "type": "string",
-            "description": "Stable slug."
-          },
-          "ownerId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "Current owner player ID, or null.",
-            "format": "uuid"
-          },
-          "troopCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "description": "Stationed troops.",
-            "format": "int32"
-          },
-          "active": {
-            "type": "boolean",
-            "description": "Active in this game."
-          },
-          "neighborIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "IDs of adjacent territories."
-          }
-        },
-        "description": "Territory detail including neighbouring territory IDs."
+        }
       },
       "TerritoryResponse": {
         "required": [
           "id",
-          "continentId",
           "identifier",
           "ownerId",
           "troopCount",
-          "active"
+          "isBlizzard"
         ],
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "Territory ID.",
-            "format": "uuid"
-          },
-          "continentId": {
-            "type": "string",
-            "description": "Owning continent.",
             "format": "uuid"
           },
           "identifier": {
-            "type": "string",
-            "description": "Stable slug (e.g. \"north-africa\")."
+            "type": "string"
           },
           "ownerId": {
             "type": [
               "null",
               "string"
             ],
-            "description": "Player ID of current owner, or null if unoccupied.",
             "format": "uuid"
           },
           "troopCount": {
@@ -3437,15 +3612,12 @@
               "integer",
               "string"
             ],
-            "description": "Troops currently stationed here.",
             "format": "int32"
           },
-          "active": {
-            "type": "boolean",
-            "description": "Whether the territory is active in this game."
+          "isBlizzard": {
+            "type": "boolean"
           }
-        },
-        "description": "Territory state without neighbours."
+        }
       },
       "UpdateGameSettingRequest": {
         "required": [
@@ -3486,9 +3658,17 @@
           },
           "hasMissions": {
             "type": "boolean"
+          },
+          "blizzardCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
-        },
-        "description": "Payload to fully replace game settings."
+        }
       },
       "UpdateTroopsRequest": {
         "required": [
@@ -3502,29 +3682,25 @@
               "integer",
               "string"
             ],
-            "description": "Positive to add troops, negative to remove.",
             "format": "int32"
           }
-        },
-        "description": "Payload to add or remove troops from a territory."
+        }
       },
       "UpdateUserRequest": {
         "required": [
-          "displayName"
+          "userName"
         ],
         "type": "object",
         "properties": {
-          "displayName": {
-            "type": "string",
-            "description": "New display name."
+          "userName": {
+            "type": "string"
           }
-        },
-        "description": "Payload to update a user profile."
+        }
       },
       "UserResponse": {
         "required": [
           "id",
-          "displayName",
+          "userName",
           "email",
           "createdAt"
         ],
@@ -3532,24 +3708,19 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Stable domain user ID (also the JWT sub claim).",
             "format": "uuid"
           },
-          "displayName": {
-            "type": "string",
-            "description": "In-game display name."
+          "userName": {
+            "type": "string"
           },
           "email": {
-            "type": "string",
-            "description": "Email address."
+            "type": "string"
           },
           "createdAt": {
             "type": "string",
-            "description": "When the account was created.",
             "format": "date-time"
           }
-        },
-        "description": "Public profile of a domain user."
+        }
       },
       "ValidationProblemDetails": {
         "type": "object",
@@ -3608,10 +3779,10 @@
       "name": "BonusCards"
     },
     {
-      "name": "Continents"
+      "name": "Games"
     },
     {
-      "name": "Games"
+      "name": "Map"
     },
     {
       "name": "MissionCards"

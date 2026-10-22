@@ -7,9 +7,9 @@ namespace Risk.Infrastructure.Repositories;
 
 public class UserRepository(AppDbContext context) : Repository<User>(context), IUserRepository
 {
-    public async Task<User?> GetByEmailAsync(string email)
+    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = email.Trim().ToLowerInvariant();
-        return await _dbSet.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+        var normalizedEmail = User.NormalizeEmail(email);
+        return _dbSet.FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
     }
 }
