@@ -1,0 +1,40 @@
+name: Dependabot auto-merge
+
+# Godkender og slår auto-merge til på Dependabots docker-PR'er (nye base-image-digests).
+# Selve merget sker først, når de påkrævede checks i branch protection er grønne,
+# så Trivy og smoke-testen stadig er porten. Major-opdateringer (fx .NET 10 → 11)
+# merges ikke automatisk.
+#
+# Kræver: "Allow auto-merge" og "Allow GitHub Actions to create and approve pull
+# requests" slået til i repoets indstillinger, og rulesettet på develop med
+# CI-jobbene som påkrævede checks.
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    name: Slå auto-merge til
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == github.event.pull_request.head.repo.full_name
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Hent Dependabot-metadata
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      # Godkendelsen opfylder review-kravet i rulesettet. Kræver "Allow GitHub Actions
+      # to create and approve pull requests" under Settings → Actions → General.
+      - name: Godkend og slå auto-merge til
+        if: steps.meta.outputs.package-ecosystem == 'docker' && steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: |
+          gh pr review --approve "$PR_URL" --body "Automatisk godkendt: Dependabot-opdatering af base-image. Merges når CI er grønt."
+          gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
