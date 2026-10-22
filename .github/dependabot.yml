@@ -13,6 +13,10 @@ updates:
         patterns: ["Microsoft.AspNetCore*", "Microsoft.Extensions*"]
       tests:
         patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*", "Testcontainers*"]
+    ignore:
+      # Microsoft.AspNetCore.OpenApi 10 kræver Microsoft.OpenApi 2.x
+      - dependency-name: "Microsoft.OpenApi"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: /
