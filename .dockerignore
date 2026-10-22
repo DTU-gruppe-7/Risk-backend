@@ -13,7 +13,6 @@
 **/*.p12
 **/*.key
 **/devcert.pem
-**/setup-dev-secrets.ps1
 
 # Build output og midlertidige filer
 **/bin/

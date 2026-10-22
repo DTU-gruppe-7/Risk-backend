@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using Scalar.AspNetCore;
 using Risk.Api.Auth;
 using Risk.Api.ErrorHandling;
@@ -19,6 +20,42 @@ var builder = WebApplication.CreateBuilder(args);
 // I drift mountes secrets som filer i /run/secrets (Docker Compose secrets).
 // Filnavnet er nøglen: "Jwt__Key" bliver til Jwt:Key. Mappen findes ikke lokalt, så den er valgfri.
 builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
+// Kun lokalt: samme .env som docker compose, så "dotnet run" og "dotnet ef" ikke kræver et setup-script.
+// Filen kommer ikke med i imaget (.dockerignore), så i containere sker der intet.
+if (builder.Environment.IsDevelopment())
+{
+    var envFile = Path.Combine(builder.Environment.ContentRootPath, "..", ".env");
+    if (File.Exists(envFile))
+    {
+        var env = new Dictionary<string, string>();
+        foreach (var line in File.ReadAllLines(envFile).Select(l => l.Trim()))
+        {
+            if (line.Length == 0 || line.StartsWith('#') || !line.Contains('=')) continue;
+            var parts = line.Split('=', 2);
+            env[parts[0].Trim()] = parts[1].Trim().Trim('"', '\'');
+        }
+
+        string Require(string key) => env.TryGetValue(key, out var value) && value.Length > 0
+            ? value
+            : throw new InvalidOperationException($"{key} mangler i {Path.GetFullPath(envFile)}.");
+
+        var connection = new NpgsqlConnectionStringBuilder
+        {
+            Host = "localhost",
+            Port = int.Parse(env.GetValueOrDefault("POSTGRES_PORT", "5433")),
+            Database = Require("POSTGRES_DB"),
+            Username = Require("POSTGRES_USER"),
+            Password = Require("POSTGRES_PASSWORD"),
+        };
+
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Default"] = connection.ConnectionString,
+            ["Jwt:Key"] = Require("JWT_KEY"),
+        });
+    }
+}
 
 // Enums serialiseres som strenge. Uden dette bliver de til rå tal i
 // OpenAPI-dokumentet, og frontendens genererede typer bliver "number".
@@ -74,7 +111,7 @@ if (isDesignTime)
 else if (!jwt.IsComplete)
 {
     throw new InvalidOperationException(
-        "Jwt:Key, Jwt:Issuer og Jwt:Audience skal være sat. Kør .\\setup-dev-secrets.ps1 lokalt, " +
+        "Jwt:Key, Jwt:Issuer og Jwt:Audience skal være sat. Lokalt: opret .env ud fra .env.example, " +
         "eller sæt Jwt__Key, Jwt__Issuer og Jwt__Audience i drift.");
 }
 
