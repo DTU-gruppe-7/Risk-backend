@@ -41,7 +41,7 @@ USER $APP_UID
 ENTRYPOINT ["./efbundle"]
 
 # ---------- API (standard-target, skal stå sidst) ----------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:3ed6558056b54d5c9dfefb7ff473728e022ff2bf1d976cbf8ee07b05ec594374 AS api
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:9e3919aff68057f3e45125c5255a71d3b5f40364e45ede883348688851b9f0df AS api
 WORKDIR /app
 COPY --from=build /app/publish .
 USER $APP_UID
