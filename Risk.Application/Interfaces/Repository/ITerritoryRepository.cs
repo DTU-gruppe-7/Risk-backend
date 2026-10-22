@@ -4,6 +4,8 @@ namespace Risk.Application.Interfaces.Repository;
 
 public interface ITerritoryRepository : IRepository<Territory>
 {
-    Task<IEnumerable<Territory>> GetByGameIdAsync(Guid gameId, CancellationToken cancellationToken = default);
-    Task<IEnumerable<Territory>> GetNeighborsAsync(Guid territoryId, CancellationToken cancellationToken = default);
+    Task<Territory?> GetAsync(Guid gameId, Guid territoryId, CancellationToken cancellationToken = default);
+
+    /// <summary>All territories in the game (blizzards included), optionally only those owned by one player.</summary>
+    Task<IReadOnlyList<Territory>> GetByGameIdAsync(Guid gameId, Guid? ownerId = null, CancellationToken cancellationToken = default);
 }

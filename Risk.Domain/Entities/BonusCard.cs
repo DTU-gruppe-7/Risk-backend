@@ -1,3 +1,6 @@
+using Risk.Domain.Common;
+using Risk.Domain.Exceptions;
+
 namespace Risk.Domain.Entities;
 
 /// <summary>
@@ -34,20 +37,16 @@ public sealed class BonusCard
 
     public BonusCard(Guid gameId, BonusCardType type, string? territoryIdentifier = null)
     {
-        if (gameId == Guid.Empty)
-            throw new ArgumentException("GameId must be a valid GUID.", nameof(gameId));
-
-        GameId = gameId;
+        GameId = Guard.NotEmpty(gameId, nameof(gameId));
         Type = type;
         TerritoryIdentifier = territoryIdentifier?.Trim().ToLowerInvariant();
     }
 
     public void AssignToPlayer(Guid playerId)
     {
-        if (playerId == Guid.Empty)
-            throw new ArgumentException("PlayerId must be a valid GUID.", nameof(playerId));
+        Guard.NotEmpty(playerId, nameof(playerId));
         if (Used)
-            throw new InvalidOperationException("Cannot assign a card that has already been used.");
+            throw new BusinessRuleException("Cannot assign a card that has already been used.");
 
         PlayerId = playerId;
     }
@@ -55,7 +54,7 @@ public sealed class BonusCard
     public void MarkAsUsed()
     {
         if (Used)
-            throw new InvalidOperationException("Card has already been used.");
+            throw new BusinessRuleException("Card has already been used.");
 
         Used = true;
         PlayerId = null;

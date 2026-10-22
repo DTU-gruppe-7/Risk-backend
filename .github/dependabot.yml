@@ -17,8 +17,9 @@ updates:
   - package-ecosystem: docker
     directory: /
     target-branch: develop
+    # Dagligt: base-images genbygges med sikkerhedsrettelser, og Trivy i CI fejler på dem
     schedule:
-      interval: weekly
+      interval: daily
 
   - package-ecosystem: github-actions
     directory: /

@@ -7,23 +7,16 @@ namespace Risk.Infrastructure.Repositories;
 
 public class TerritoryRepository(AppDbContext context) : Repository<Territory>(context), ITerritoryRepository
 {
-    public async Task<IEnumerable<Territory>> GetByGameIdAsync(Guid gameId,
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbSet
-            .Where(t => EF.Property<Guid>(t, "GameId") == gameId)
-            .Include(t => t.Owner)
-            .Include(t => t.Continent)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<Territory?> GetAsync(Guid gameId, Guid territoryId, CancellationToken cancellationToken = default) =>
+        _dbSet.FirstOrDefaultAsync(t => t.Id == territoryId && t.GameId == gameId, cancellationToken);
 
-    public async Task<IEnumerable<Territory>> GetNeighborsAsync(Guid territoryId,
+    public async Task<IReadOnlyList<Territory>> GetByGameIdAsync(Guid gameId, Guid? ownerId = null,
         CancellationToken cancellationToken = default)
     {
-        return await _context.TerritoryBorders
-                .Where(tb => tb.TerritoryId == territoryId && tb.BorderingTerritory != null)
-                .Select(tb => tb.BorderingTerritory!)
-                .ToListAsync(cancellationToken);
+        var query = _dbSet.AsNoTracking().Where(t => t.GameId == gameId);
+        if (ownerId.HasValue)
+            query = query.Where(t => t.OwnerId == ownerId.Value);
+
+        return await query.OrderBy(t => t.Identifier).ToListAsync(cancellationToken);
     }
 }
-    

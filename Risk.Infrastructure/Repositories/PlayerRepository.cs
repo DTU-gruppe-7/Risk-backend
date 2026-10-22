@@ -5,22 +5,27 @@ using Risk.Infrastructure.Persistence;
 
 namespace Risk.Infrastructure.Repositories;
 
-public class PlayerRepository(AppDbContext context) : Repository<Player>(context), IPlayerRepository
+public class PlayerRepository(AppDbContext context) : IPlayerRepository
 {
-    public async Task<IEnumerable<Player>> GetPlayersByGameIdAsync(Guid gameId, CancellationToken cancellationToken = default)
+    private readonly DbSet<Player> _players = context.Players;
+
+    public Task<Player?> GetAsync(Guid gameId, Guid playerId, CancellationToken cancellationToken = default) =>
+        _players.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == playerId && p.GameId == gameId, cancellationToken);
+
+    public async Task<IReadOnlyList<Player>> GetPlayersByGameIdAsync(Guid gameId, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await _players
+            .AsNoTracking()
             .Where(p => p.GameId == gameId)
-            .Include(p => p.User)
-            .Include(p => p.Territories)
+            .OrderBy(p => p.TurnOrder)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Player?> GetByGameAndUserIdAsync(Guid gameId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        return await _dbSet
+    public Task<Player?> GetByGameAndUserIdAsync(Guid gameId, Guid userId, CancellationToken cancellationToken = default) =>
+        _players
+            .AsNoTracking()
             .Include(p => p.User)
             .Include(p => p.Territories)
             .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId, cancellationToken);
-    }
 }

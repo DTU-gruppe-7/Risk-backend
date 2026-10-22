@@ -1,12 +1,23 @@
+using Risk.Domain.Common;
+using Risk.Domain.Exceptions;
+using Risk.Domain.Map;
+
 namespace Risk.Domain.Entities;
 
 /// <summary>
 /// Represents an active or completed Risk game session.
-/// Acts as the aggregate root for a single game.
+/// Acts as the aggregate root for a single game: settings and players are
+/// only changed through this class, so the game rules live in one place.
 /// </summary>
 public sealed class Game
 {
     public Guid Id { get; private set; } = Guid.CreateVersion7();
+
+    /// <summary>
+    /// Increases on every change to the aggregate. Used as a concurrency token,
+    /// and lets clients ignore pushed updates older than what they already have.
+    /// </summary>
+    public long Version { get; private set; }
 
     /// <summary>The user who created and hosts the game.</summary>
     public Guid HostId { get; private set; }
@@ -27,50 +38,157 @@ public sealed class Game
     private readonly List<Player> _players = [];
     public IReadOnlyCollection<Player> Players => _players.AsReadOnly();
 
+    /// <summary>This game's state for each map territory. Empty until the game starts.</summary>
     private readonly List<Territory> _territories = [];
     public IReadOnlyCollection<Territory> Territories => _territories.AsReadOnly();
-
-    private readonly List<Continent> _continents = [];
-    public IReadOnlyCollection<Continent> Continents => _continents.AsReadOnly();
 
     // EF Core requires a parameterless constructor
     private Game() { }
 
     public Game(Guid hostId)
     {
-        if (hostId == Guid.Empty)
-            throw new ArgumentException("HostId must be a valid GUID.", nameof(hostId));
-
-        HostId = hostId;
+        HostId = Guard.NotEmpty(hostId, nameof(hostId));
+        Settings = new GameSetting(Id);
     }
 
-    public void Start()
+    public int MaxPlayers => Settings?.MaxPlayers ?? GameSetting.DefaultMaxPlayers;
+
+    public bool IsHost(Guid userId) => HostId == userId;
+
+    /// <summary>True for the host and for every user who has joined as a player.</summary>
+    public bool HasParticipant(Guid userId) =>
+        IsHost(userId) || _players.Any(p => p.UserId == userId);
+
+    public Player? FindPlayer(Guid playerId) => _players.FirstOrDefault(p => p.Id == playerId);
+
+    /// <summary>The board with this game's territory state. Requires <see cref="Territories"/> to be loaded.</summary>
+    public GameBoard BoardOn(MapGraph map) => new(map, _territories);
+
+    // -------------------------------------------------------------------------
+    // Lobby
+    // -------------------------------------------------------------------------
+
+    public void ConfigureSettings(int maxPlayers, int timer, int turnTimeLimit, bool hasFogOfWar, bool hasMissions,
+        int blizzardCount = 0)
     {
-        if (State != GameState.Lobby)
-            throw new InvalidOperationException("Game can only be started from the Lobby state.");
+        EnsureState(GameState.Lobby, "Settings can only be changed while the game is in the Lobby.");
+        if (maxPlayers < _players.Count)
+            throw new BusinessRuleException("MaxPlayers cannot be lower than the number of players already in the game.");
+
+        if (Settings is null)
+            Settings = new GameSetting(Id, maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount);
+        else
+            Settings.Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount);
+
+        BumpVersion();
+    }
+
+    public Player AddPlayer(Guid userId, string color)
+    {
+        EnsureState(GameState.Lobby, "The game has already started.");
+        if (_players.Any(p => p.UserId == userId))
+            throw new BusinessRuleException("You are already in this game.");
+        if (_players.Count >= MaxPlayers)
+            throw new BusinessRuleException("The game is full.");
+
+        // Max + 1 instead of Count + 1, so a player leaving never causes duplicate turn orders.
+        var turnOrder = _players.Count == 0 ? 1 : _players.Max(p => p.TurnOrder) + 1;
+        var player = new Player(Id, userId, color, turnOrder);
+        _players.Add(player);
+        BumpVersion();
+        return player;
+    }
+
+    public void RemovePlayer(Guid playerId)
+    {
+        EnsureState(GameState.Lobby, "Cannot leave a game that has already started.");
+        _players.Remove(RequirePlayer(playerId));
+        BumpVersion();
+    }
+
+    // -------------------------------------------------------------------------
+    // Game flow
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Starts the game and lays out the board: one unoccupied territory per map territory,
+    /// with <see cref="GameSetting.BlizzardCount"/> of them turned into blizzards.
+    /// </summary>
+    /// <param name="map">The board.</param>
+    /// <param name="random">Decides blizzard placement. Pass a seeded instance in tests.</param>
+    public void Start(MapGraph map, Random random)
+    {
+        EnsureState(GameState.Lobby, "Game can only be started from the Lobby state.");
+        if (map.TerritoryIds.Count == 0)
+            throw new DomainValidationException("The map has no territories.");
+
+        var blizzards = BlizzardPlacement.Choose(
+            map, Settings?.BlizzardCount ?? 0, minPlayable: _players.Count, random);
+
+        foreach (var id in map.TerritoryIds)
+        {
+            var territory = new Territory(Id, id);
+            if (blizzards.Contains(id))
+                territory.MakeBlizzard();
+            _territories.Add(territory);
+        }
 
         State = GameState.InProgress;
         StartedAt = DateTimeOffset.UtcNow;
+        BumpVersion();
     }
 
     public void End()
     {
-        if (State != GameState.InProgress)
-            throw new InvalidOperationException("Game can only be ended when in progress.");
-
+        EnsureState(GameState.InProgress, "Game can only be ended when in progress.");
         State = GameState.Finished;
         EndedAt = DateTimeOffset.UtcNow;
+        BumpVersion();
     }
 
     public void SetCurrentPlayer(Guid playerId)
     {
+        EnsureState(GameState.InProgress, "The current player can only be set while the game is in progress.");
+        if (RequirePlayer(playerId).IsEliminated)
+            throw new BusinessRuleException("An eliminated player cannot take a turn.");
+
         CurrentPlayerId = playerId;
+        BumpVersion();
     }
 
     public void SetPhase(GamePhase phase)
     {
+        EnsureState(GameState.InProgress, "The phase can only be changed while the game is in progress.");
         CurrentPhase = phase;
+        BumpVersion();
     }
+
+    public void ReinforcePlayer(Guid playerId, int troops)
+    {
+        RequirePlayer(playerId).AddReinforcements(troops);
+        BumpVersion();
+    }
+
+    public void EliminatePlayer(Guid playerId)
+    {
+        RequirePlayer(playerId).Eliminate();
+        BumpVersion();
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private Player RequirePlayer(Guid playerId) =>
+        FindPlayer(playerId) ?? throw new BusinessRuleException("The player is not part of this game.");
+
+    private void EnsureState(GameState expected, string message)
+    {
+        if (State != expected)
+            throw new BusinessRuleException(message);
+    }
+
+    private void BumpVersion() => Version++;
 }
 
 public enum GameState

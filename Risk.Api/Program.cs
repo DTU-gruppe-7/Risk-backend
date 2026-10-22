@@ -6,7 +6,12 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using Risk.Api.Auth;
+using Risk.Api.ErrorHandling;
+using Risk.Application;
+using Risk.Application.Interfaces;
 using Risk.Infrastructure;
+using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,7 +28,15 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddOpenApi();
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+
+// Domain/application exceptions → ProblemDetails (RFC 7807), see ProblemDetailsExceptionHandler.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
 
 // Kun til lokal udvikling. I drift serveres frontend og API fra samme origin via Caddy.
 builder.Services.AddCors(options =>
@@ -50,15 +63,15 @@ builder.Services.AddHealthChecks()
 // host'en uden at starte den. Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
 var isDesignTime = Assembly.GetEntryAssembly() != Assembly.GetExecutingAssembly();
 
-var signingKey = builder.Configuration["Jwt:Key"];
-var issuer = builder.Configuration["Jwt:Issuer"];
-var audience = builder.Configuration["Jwt:Audience"];
+// Samme JwtOptions som JwtTokenService bruger, så udstedelse og validering aldrig kan glide fra hinanden.
+var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
 if (isDesignTime)
 {
-    signingKey ??= "design-time-placeholder-bruges-aldrig-til-rigtige-tokens";
+    if (string.IsNullOrWhiteSpace(jwt.Key))
+        jwt.Key = "design-time-placeholder-bruges-aldrig-til-rigtige-tokens";
 }
-else if (string.IsNullOrWhiteSpace(signingKey) || string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience))
+else if (!jwt.IsComplete)
 {
     throw new InvalidOperationException(
         "Jwt:Key, Jwt:Issuer og Jwt:Audience skal være sat. Kør .\\setup-dev-secrets.ps1 lokalt, " +
@@ -72,11 +85,11 @@ builder.Services
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = issuer,
+            ValidIssuer = jwt.Issuer,
             ValidateAudience = true,
-            ValidAudience = audience,
+            ValidAudience = jwt.Audience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30)
         };
@@ -87,6 +100,7 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 
 app.UseForwardedHeaders();
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
