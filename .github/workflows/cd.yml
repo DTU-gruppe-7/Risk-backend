@@ -54,17 +54,34 @@ jobs:
         run: |
           case "$EVENT" in
             push)
-              author=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].user.login // ""')
+              # Commit→PR-koblingen oprettes asynkront efter et merge og kan
+              # mangle et øjeblik, så prøv igen før vi beslutter os
+              author=""
+              for i in 1 2 3 4 5; do
+                if author=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].user.login // ""' 2>/dev/null) \
+                   && [ -n "$author" ]; then
+                  break
+                fi
+                author=""
+                sleep $((i * 5))
+              done
               if [ "$author" = "dependabot[bot]" ]; then
                 echo "::notice::Dependabot-opdatering: deployes i nat-buildet eller ved manuel kørsel af CD"
                 build=false
               else
+                [ -z "$author" ] && echo "::warning::Kunne ikke slå PR op for $GITHUB_SHA; bygger for en sikkerheds skyld"
                 build=true
               fi
               ;;
             schedule)
-              tree=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.tree.sha)
-              if docker buildx imagetools inspect "$REGISTRY/risk-api:tree-$tree" >/dev/null 2>&1; then
+              tree=""
+              for i in 1 2 3; do
+                tree=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.tree.sha 2>/dev/null) && [ -n "$tree" ] && break
+                tree=""
+                sleep 10
+              done
+              [ -z "$tree" ] && echo "::warning::Kunne ikke slå tree op for $GITHUB_SHA; bygger for en sikkerheds skyld"
+              if [ -n "$tree" ] && docker buildx imagetools inspect "$REGISTRY/risk-api:tree-$tree" >/dev/null 2>&1; then
                 echo "::notice::tree-$tree er allerede bygget, intet at deploye"
                 build=false
               else
