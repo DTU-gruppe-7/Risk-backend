@@ -1,4 +1,4 @@
-﻿# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1
 
 # Base-images er pinnet til digest (uforanderlige). Tagget står med for læsbarhed,
 # og så Dependabot kan finde og opdatere dem.
@@ -31,7 +31,7 @@ RUN dotnet ef migrations bundle \
       --output /app/efbundle
 
 # ---------- Migrator (engangs-container) ----------
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:b9f2fd17cfd23c997453e83adeaf2f2d20561f9754eb3ed5dbc97bd06867c377 AS migrator
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:ca9e4a528c6621e61243a8f7eb8cffd3e429bd504b93a067f417a538bf688ceb AS migrator
 WORKDIR /app
 # Single-file bundles udpakker til $HOME som standard. /tmp er den eneste
 # skrivbare sti, når containeren kører read-only.
