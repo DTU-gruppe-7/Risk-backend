@@ -21,7 +21,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.KeyPerFile" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.13" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.17.4" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.2" />
   </ItemGroup>
 
   <ItemGroup>
