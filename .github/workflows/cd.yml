@@ -3,6 +3,12 @@ name: CD
 on:
   push:
     branches: [develop, main]
+  # Nat-build af develop: samler Dependabot-opdateringer i ét deploy. Auto-mergede PR'er
+  # udløser ikke push-workflows (de merges med GITHUB_TOKEN), så de kommer også med her.
+  schedule:
+    - cron: '0 1 * * *'   # 03:00 dansk sommertid, 02:00 vintertid
+  # Manuelt deploy af develop, fx når en kritisk rettelse ikke skal vente til natten
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,9 +22,65 @@ env:
 
 jobs:
   # ---------------- develop: byg, signér og deploy til dev ----------------
+  # push:              byg, medmindre commit'en kommer fra en Dependabot-PR
+  # schedule:          byg kun, hvis det nuværende tree ikke allerede er bygget
+  # workflow_dispatch: byg altid
+  gate:
+    name: Skal der bygges?
+    if: github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: read
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+        if: github.event_name == 'schedule'
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: github.event_name == 'schedule'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Afgør
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          case "$EVENT" in
+            push)
+              author=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].user.login // ""')
+              if [ "$author" = "dependabot[bot]" ]; then
+                echo "::notice::Dependabot-opdatering: deployes i nat-buildet eller ved manuel kørsel af CD"
+                build=false
+              else
+                build=true
+              fi
+              ;;
+            schedule)
+              tree=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.tree.sha)
+              if docker buildx imagetools inspect "$REGISTRY/risk-api:tree-$tree" >/dev/null 2>&1; then
+                echo "::notice::tree-$tree er allerede bygget, intet at deploye"
+                build=false
+              else
+                build=true
+              fi
+              ;;
+            *)
+              build=true
+              ;;
+          esac
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
   build:
     name: Byg, signér og push
-    if: github.ref_name == 'develop'
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
