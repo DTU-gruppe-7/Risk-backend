@@ -25,32 +25,53 @@ Risk-backend/
 ## Prerequisites
 
 * .NET 10 SDK
-* PostgreSQL (running locally or via Docker)
-* EF Core CLI Tools (dotnet tool install --global dotnet-ef)
+* Docker (Desktop or Engine with Compose v2)
+* EF Core CLI for the commands below: `dotnet tool restore` (pinned in `.config/dotnet-tools.json`)
 
 ---
 
 ## Getting Started
 
-### 1. Configure Local Database Credentials
-To avoid committing passwords to Git, use **.NET User Secrets** for your local connection string:
+### 1. Configure Local Secrets
+`.env` is the single source of truth for local secrets (it is git-ignored). Docker Compose reads it,
+and so does the API itself when it runs in Development (`dotnet run`, `dotnet watch`, `dotnet ef`):
 
-```bash
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=RiskDB;Username=postgres;Password=<YOUR_LOCAL_PASSWORD>" --project Risk.Api
+```powershell
+Copy-Item .env.example .env   # then change POSTGRES_PASSWORD and JWT_KEY
 ```
 
-### 2. Apply Database Migrations
-Update your local PostgreSQL database with the latest schema:
+Changes to `.env` take effect the next time the API starts.
+
+### 2. Start the Database and Apply Migrations
+Same flow as on the server: `db` → `migrator` (one-off EF migration bundle) → `api`.
 
 ```bash
-dotnet ef database update --project Risk.Infrastructure --startup-project Risk.Api
+docker compose up -d --build migrator
 ```
 
-### 3. Build and Run
+### 3. Run the API
+Either on the host with hot reload:
+
 ```bash
-dotnet build
-dotnet run --project Risk.Api
+dotnet watch --project Risk.Api
 ```
+
+or the whole backend in Docker (same image and hardening as production):
+
+```bash
+docker compose up -d --build
+```
+
+Both listen on `http://localhost:5081`, which is where the frontend's Vite proxy points by default
+(`npm run dev` in the frontend repo needs no extra configuration). Don't run both at once — they share the port.
+
+The API reference (Scalar) is at `http://localhost:5081/scalar/v1` (Development only).
+
+### 4. Day to Day
+* **New migrations** (after `git pull` or `dotnet ef migrations add`): run `docker compose up -d --build migrator` again.
+  `dotnet ef database update` (see below) works too.
+* **Stop:** `docker compose down` — the database is kept in the `pgdata` volume.
+* **Start over with an empty database:** `docker compose down -v`, then step 2 again.
 
 ---
 
