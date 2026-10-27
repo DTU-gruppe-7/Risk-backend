@@ -43,9 +43,7 @@ public class GameplayService(
             toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
         }
 
-        await territoryRepository.UpdateAsync(fromTerritory);
-        await territoryRepository.UpdateAsync(toTerritory);
-        await territoryRepository.SaveChangesAsync();
+        await gameRepository.SaveChangesAsync();
 
         return new AttackResultDto(
             AttackerLosses: battle.AttackerLosses,
@@ -98,15 +96,12 @@ public class GameplayService(
         bool conquered = toTerritory.TroopCount == 0;
         if (conquered)
         {
-            // Ved Blitz rykkes alle overskydende tropper (undtagen den 1 der skal blive tilbage)
             int movingTroops = fromTerritory.TroopCount - 1;
             fromTerritory.RemoveTroops(movingTroops);
             toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
         }
 
-        await territoryRepository.UpdateAsync(fromTerritory);
-        await territoryRepository.UpdateAsync(toTerritory);
-        await territoryRepository.SaveChangesAsync();
+        await gameRepository.SaveChangesAsync();
 
         return new BlitzResultDto(
             TotalAttackerLosses: totalAttackerLosses,
@@ -125,7 +120,7 @@ public class GameplayService(
         Guid toTerritoryId,
         CancellationToken cancellationToken)
     {
-        var game = await gameRepository.GetByIdAsync(gameId)
+        var game = await gameRepository.GetByIdWithDetailsAsync(gameId, cancellationToken)
             ?? throw new KeyNotFoundException($"Game {gameId} not found.");
 
         if (game.CurrentPhase != GamePhase.Attack)
