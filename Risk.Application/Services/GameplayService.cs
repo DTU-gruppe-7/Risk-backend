@@ -1,4 +1,5 @@
 ﻿using Risk.Application.DTOs;
+using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Application.Interfaces.Services;
 using Risk.Domain.Entities;
@@ -9,6 +10,8 @@ namespace Risk.Application.Services;
 public class GameplayService(
     IGameRepository gameRepository,
     ITerritoryRepository territoryRepository,
+    IMapRepository mapRepository,
+    IUnitOfWork unitOfWork,
     IDiceRoller diceRoller) : IGameplayService
 {
     public async Task<AttackResultDto> AttackAsync(AttackDto dto, CancellationToken cancellationToken = default)
@@ -43,7 +46,7 @@ public class GameplayService(
             toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
         }
 
-        await gameRepository.SaveChangesAsync();
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new AttackResultDto(
             AttackerLosses: battle.AttackerLosses,
@@ -101,7 +104,7 @@ public class GameplayService(
             toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
         }
 
-        await gameRepository.SaveChangesAsync();
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new BlitzResultDto(
             TotalAttackerLosses: totalAttackerLosses,
@@ -141,8 +144,10 @@ public class GameplayService(
         if (toTerritory.OwnerId == playerId)
             throw new InvalidOperationException("Cannot attack your own territory.");
 
-        var neighbors = await territoryRepository.GetNeighborsAsync(fromTerritory.Id, cancellationToken);
-        if (!neighbors.Any(n => n.Id == toTerritory.Id))
+        var graph = await mapRepository.GetGraphAsync(cancellationToken);
+        var neighbors = graph.NeighborsOf(fromTerritory.Id.ToString());
+
+        if (!neighbors.Contains(toTerritory.Id.ToString()))
             throw new InvalidOperationException("Target territory is not adjacent to the attacking territory.");
 
         return (fromTerritory, toTerritory);

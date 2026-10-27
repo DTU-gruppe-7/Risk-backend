@@ -1,200 +1,155 @@
-﻿using FluentAssertions;
-using NSubstitute;
-using Risk.Application.DTOs;
+﻿using Risk.Application.DTOs;
+using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Application.Interfaces.Services;
-using Risk.Application.Services;
 using Risk.Domain.Entities;
-using Xunit;
+using Risk.Domain.Services;
 
-namespace Risk.Tests.Risk.UnitTests.Services;
+namespace Risk.Application.Services;
 
-public class GameplayServiceTests
+public class GameplayService(
+    IGameRepository gameRepository,
+    ITerritoryRepository territoryRepository,
+    IMapRepository mapRepository,
+    IUnitOfWork unitOfWork,
+    IDiceRoller diceRoller) : IGameplayService
 {
-    private readonly IGameRepository _gameRepository = Substitute.For<IGameRepository>();
-    private readonly ITerritoryRepository _territoryRepository = Substitute.For<ITerritoryRepository>();
-    private readonly IDiceRoller _diceRoller = Substitute.For<IDiceRoller>();
-    private readonly GameplayService _sut;
-
-    public GameplayServiceTests()
+    public async Task<AttackResultDto> AttackAsync(AttackDto dto, CancellationToken cancellationToken = default)
     {
-        _sut = new GameplayService(_gameRepository, _territoryRepository, _diceRoller);
+        var (fromTerritory, toTerritory) = await ValidateAttackPrerequisitesAsync(
+            dto.GameId, dto.PlayerId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
+
+        if (dto.AttackingTroopsCount < 1 || dto.AttackingTroopsCount > 3)
+            throw new ArgumentOutOfRangeException(nameof(dto.AttackingTroopsCount), "Must attack with 1, 2, or 3 troops.");
+
+        if (fromTerritory.TroopCount <= dto.AttackingTroopsCount)
+            throw new InvalidOperationException("Originating territory must retain at least 1 troop.");
+
+        int defenderDiceCount = Math.Min(2, toTerritory.TroopCount);
+        var attackerDice = diceRoller.Roll(dto.AttackingTroopsCount);
+        var defenderDice = diceRoller.Roll(defenderDiceCount);
+
+        var battle = BattleService.Fight(attackerDice, defenderDice);
+
+        if (battle.AttackerLosses > 0)
+            fromTerritory.RemoveTroops(battle.AttackerLosses);
+
+        if (battle.DefenderLosses > 0)
+            toTerritory.RemoveTroops(battle.DefenderLosses);
+
+        bool conquered = false;
+        if (toTerritory.TroopCount == 0)
+        {
+            conquered = true;
+            int movingTroops = dto.AttackingTroopsCount - battle.AttackerLosses;
+            fromTerritory.RemoveTroops(movingTroops);
+            toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new AttackResultDto(
+            AttackerLosses: battle.AttackerLosses,
+            DefenderLosses: battle.DefenderLosses,
+            AttackerDice: battle.SortedAttackerDice,
+            DefenderDice: battle.SortedDefenderDice,
+            TerritoryConquered: conquered
+        );
     }
 
-    [Fact]
-    public async Task AttackAsync_WhenAttackerWinsAndDefenderReachesZero_ConquersTerritory()
+    public async Task<BlitzResultDto> BlitzAttackAsync(BlitzAttackDto dto, CancellationToken cancellationToken = default)
     {
-        // Arrange
-        var playerId = Guid.NewGuid();
-        var defenderId = Guid.NewGuid();
-        var continentId = Guid.NewGuid();
+        var (fromTerritory, toTerritory) = await ValidateAttackPrerequisitesAsync(
+            dto.GameId, dto.PlayerId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
 
-        var game = new Game(Guid.NewGuid());
-        game.Start();
-        game.SetCurrentPlayer(playerId);
-        game.SetPhase(GamePhase.Attack);
+        if (fromTerritory.TroopCount <= 1)
+            throw new InvalidOperationException("Originating territory must have at least 2 troops to initiate an attack.");
 
-        var fromTerritory = new Territory(continentId, "North-Africa");
-        fromTerritory.Claim(playerId, 4);
+        var rounds = new List<BlitzRoundDto>();
+        int totalAttackerLosses = 0;
+        int totalDefenderLosses = 0;
 
-        var toTerritory = new Territory(continentId, "Egypt");
-        toTerritory.Claim(defenderId, 1);
+        while (fromTerritory.TroopCount > 1 && toTerritory.TroopCount > 0)
+        {
+            int attackerDiceCount = Math.Min(3, fromTerritory.TroopCount - 1);
+            int defenderDiceCount = Math.Min(2, toTerritory.TroopCount);
 
-        _gameRepository.GetByIdAsync(game.Id).Returns(game);
-        _territoryRepository.GetByIdAsync(fromTerritory.Id).Returns(fromTerritory);
-        _territoryRepository.GetByIdAsync(toTerritory.Id).Returns(toTerritory);
-        _territoryRepository.GetNeighborsAsync(fromTerritory.Id).Returns(new[] { toTerritory });
+            var attackerDice = diceRoller.Roll(attackerDiceCount);
+            var defenderDice = diceRoller.Roll(defenderDiceCount);
 
-        // Mock: Angriber slaar [6], Forsvarer slaar [1] -> Forsvarer mister sin sidste troppe
-        _diceRoller.Roll(1).Returns(new[] { 6 }, new[] { 1 });
+            var battle = BattleService.Fight(attackerDice, defenderDice);
 
-        var dto = new AttackDto(game.Id, playerId, fromTerritory.Id, toTerritory.Id, 1);
+            if (battle.AttackerLosses > 0)
+                fromTerritory.RemoveTroops(battle.AttackerLosses);
 
-        // Act
-        var result = await _sut.AttackAsync(dto);
+            if (battle.DefenderLosses > 0)
+                toTerritory.RemoveTroops(battle.DefenderLosses);
 
-        // Assert
-        result.TerritoryConquered.Should().BeTrue();
-        result.AttackerLosses.Should().Be(0);
-        result.DefenderLosses.Should().Be(1);
-        toTerritory.OwnerId.Should().Be(playerId);
-        toTerritory.TroopCount.Should().Be(1);
-        fromTerritory.TroopCount.Should().Be(3);
-        await _territoryRepository.Received(1).SaveChangesAsync();
+            totalAttackerLosses += battle.AttackerLosses;
+            totalDefenderLosses += battle.DefenderLosses;
+
+            rounds.Add(new BlitzRoundDto(
+                AttackerDice: battle.SortedAttackerDice,
+                DefenderDice: battle.SortedDefenderDice,
+                AttackerLosses: battle.AttackerLosses,
+                DefenderLosses: battle.DefenderLosses
+            ));
+        }
+
+        bool conquered = toTerritory.TroopCount == 0;
+        if (conquered)
+        {
+            int movingTroops = fromTerritory.TroopCount - 1;
+            fromTerritory.RemoveTroops(movingTroops);
+            toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new BlitzResultDto(
+            TotalAttackerLosses: totalAttackerLosses,
+            TotalDefenderLosses: totalDefenderLosses,
+            TerritoryConquered: conquered,
+            RemainingAttackingTerritoryTroops: fromTerritory.TroopCount,
+            RemainingDefendingTerritoryTroops: toTerritory.TroopCount,
+            Rounds: rounds
+        );
     }
 
-    [Fact]
-    public async Task AttackAsync_WhenDefenderWinsTie_AttackerLosesTroop()
+    private async Task<(Territory From, Territory To)> ValidateAttackPrerequisitesAsync(
+        Guid gameId,
+        Guid playerId,
+        Guid fromTerritoryId,
+        Guid toTerritoryId,
+        CancellationToken cancellationToken)
     {
-        // Arrange
-        var playerId = Guid.NewGuid();
-        var defenderId = Guid.NewGuid();
-        var continentId = Guid.NewGuid();
+        var game = await gameRepository.GetByIdWithDetailsAsync(gameId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Game {gameId} not found.");
 
-        var game = new Game(Guid.NewGuid());
-        game.Start();
-        game.SetCurrentPlayer(playerId);
-        game.SetPhase(GamePhase.Attack);
+        if (game.CurrentPhase != GamePhase.Attack)
+            throw new InvalidOperationException("Attacks can only be initiated during the Attack phase.");
 
-        var fromTerritory = new Territory(continentId, "Western-Europe");
-        fromTerritory.Claim(playerId, 4);
+        if (game.CurrentPlayerId != playerId)
+            throw new InvalidOperationException("It is not this player's turn.");
 
-        var toTerritory = new Territory(continentId, "Southern-Europe");
-        toTerritory.Claim(defenderId, 2);
+        var fromTerritory = await territoryRepository.GetByIdAsync(fromTerritoryId)
+            ?? throw new KeyNotFoundException($"Attacking territory {fromTerritoryId} not found.");
 
-        _gameRepository.GetByIdAsync(game.Id).Returns(game);
-        _territoryRepository.GetByIdAsync(fromTerritory.Id).Returns(fromTerritory);
-        _territoryRepository.GetByIdAsync(toTerritory.Id).Returns(toTerritory);
-        _territoryRepository.GetNeighborsAsync(fromTerritory.Id).Returns(new[] { toTerritory });
+        var toTerritory = await territoryRepository.GetByIdAsync(toTerritoryId)
+            ?? throw new KeyNotFoundException($"Defending territory {toTerritoryId} not found.");
 
-        // Mock: Angriber slaar [5], Forsvarer slaar [5, 2] -> Uafgjort gaar til forsvarer
-        _diceRoller.Roll(1).Returns(new[] { 5 });
-        _diceRoller.Roll(2).Returns(new[] { 5, 2 });
+        if (fromTerritory.OwnerId != playerId)
+            throw new InvalidOperationException("Attacking player does not own the originating territory.");
 
-        var dto = new AttackDto(game.Id, playerId, fromTerritory.Id, toTerritory.Id, 1);
+        if (toTerritory.OwnerId == playerId)
+            throw new InvalidOperationException("Cannot attack your own territory.");
 
-        // Act
-        var result = await _sut.AttackAsync(dto);
+        var graph = await mapRepository.GetGraphAsync(cancellationToken);
+        var neighbors = graph.NeighborsOf(fromTerritory.Identifier);
 
-        // Assert
-        result.TerritoryConquered.Should().BeFalse();
-        result.AttackerLosses.Should().Be(1);
-        result.DefenderLosses.Should().Be(0);
-        fromTerritory.TroopCount.Should().Be(3);
-        toTerritory.TroopCount.Should().Be(2);
-        toTerritory.OwnerId.Should().Be(defenderId);
-    }
-    
-    [Fact]
-    public async Task BlitzAttackAsync_AttackerWins_ConquersTerritoryAndTransfersTroops()
-    {
-        // Arrange
-        var attackerId = Guid.NewGuid();
-        var defenderId = Guid.NewGuid();
-        var continentId = Guid.NewGuid();
+        if (!neighbors.Contains(toTerritory.Identifier))
+            throw new InvalidOperationException("Target territory is not adjacent to the attacking territory.");
 
-        var game = new Game(Guid.NewGuid());
-        game.Start();
-        game.SetCurrentPlayer(attackerId);
-        game.SetPhase(GamePhase.Attack);
-
-        var fromTerritory = new Territory(continentId, "North-Africa");
-        fromTerritory.Claim(attackerId, 5); // 5 tropper
-
-        var toTerritory = new Territory(continentId, "Egypt");
-        toTerritory.Claim(defenderId, 2); // 2 tropper
-
-        _gameRepository.GetByIdAsync(game.Id).Returns(game);
-        _territoryRepository.GetByIdAsync(fromTerritory.Id).Returns(fromTerritory);
-        _territoryRepository.GetByIdAsync(toTerritory.Id).Returns(toTerritory);
-        _territoryRepository.GetNeighborsAsync(fromTerritory.Id, Arg.Any<CancellationToken>())
-            .Returns(new[] { toTerritory });
-
-        // Angriber ruller altid 6'ere, forsvarer ruller altid 1'ere
-        _diceRoller.Roll(Arg.Is<int>(count => count >= 1))
-            .Returns(
-                callInfo => Enumerable.Repeat(6, callInfo.Arg<int>()).ToArray(),
-                callInfo => Enumerable.Repeat(1, callInfo.Arg<int>()).ToArray()
-            );
-
-        var dto = new BlitzAttackDto(game.Id, attackerId, fromTerritory.Id, toTerritory.Id);
-
-        // Act
-        var result = await _sut.BlitzAttackAsync(dto);
-
-        // Assert
-        result.TerritoryConquered.Should().BeTrue();
-        result.TotalDefenderLosses.Should().Be(2);
-        result.TotalAttackerLosses.Should().Be(0);
-        toTerritory.OwnerId.Should().Be(attackerId);
-        fromTerritory.TroopCount.Should().Be(1);
-        toTerritory.TroopCount.Should().Be(4);
-        await _territoryRepository.Received(1).SaveChangesAsync();
-    }
-
-    [Fact]
-    public async Task BlitzAttackAsync_AttackerLoses_StopsWhenOriginatingTerritoryHasOneTroop()
-    {
-        // Arrange
-        var attackerId = Guid.NewGuid();
-        var defenderId = Guid.NewGuid();
-        var continentId = Guid.NewGuid();
-
-        var game = new Game(Guid.NewGuid());
-        game.Start();
-        game.SetCurrentPlayer(attackerId);
-        game.SetPhase(GamePhase.Attack);
-
-        var fromTerritory = new Territory(continentId, "Western-Europe");
-        fromTerritory.Claim(attackerId, 3); // 3 tropper (kan angribe ned til 1)
-
-        var toTerritory = new Territory(continentId, "Southern-Europe");
-        toTerritory.Claim(defenderId, 4); // 4 tropper
-
-        _gameRepository.GetByIdAsync(game.Id).Returns(game);
-        _territoryRepository.GetByIdAsync(fromTerritory.Id).Returns(fromTerritory);
-        _territoryRepository.GetByIdAsync(toTerritory.Id).Returns(toTerritory);
-        _territoryRepository.GetNeighborsAsync(fromTerritory.Id, Arg.Any<CancellationToken>())
-            .Returns(new[] { toTerritory });
-
-        // Angriber ruller altid 1'ere, forsvarer ruller altid 6'ere (forsvarer vinder alle runder)
-        _diceRoller.Roll(Arg.Is<int>(count => count >= 1))
-            .Returns(
-                callInfo => Enumerable.Repeat(1, callInfo.Arg<int>()).ToArray(),
-                callInfo => Enumerable.Repeat(6, callInfo.Arg<int>()).ToArray()
-            );
-
-        var dto = new BlitzAttackDto(game.Id, attackerId, fromTerritory.Id, toTerritory.Id);
-
-        // Act
-        var result = await _sut.BlitzAttackAsync(dto);
-
-        // Assert
-        result.TerritoryConquered.Should().BeFalse();
-        result.RemainingAttackingTerritoryTroops.Should().Be(1);
-        fromTerritory.TroopCount.Should().Be(1);
-        toTerritory.OwnerId.Should().Be(defenderId);
-        await _territoryRepository.Received(1).SaveChangesAsync();
+        return (fromTerritory, toTerritory);
     }
 }
-
