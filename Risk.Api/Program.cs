@@ -1,12 +1,61 @@
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
-using System.Reflection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using Scalar.AspNetCore;
+using Risk.Api.Auth;
+using Risk.Api.ErrorHandling;
+using Risk.Application;
+using Risk.Application.Interfaces;
 using Risk.Infrastructure;
+using Risk.Infrastructure.Identity;
+using Risk.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// I drift mountes secrets som filer i /run/secrets (Docker Compose secrets).
+// Filnavnet er nøglen: "Jwt__Key" bliver til Jwt:Key. Mappen findes ikke lokalt, så den er valgfri.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
+// Kun lokalt: samme .env som docker compose, så "dotnet run" og "dotnet ef" ikke kræver et setup-script.
+// Filen kommer ikke med i imaget (.dockerignore), så i containere sker der intet.
+if (builder.Environment.IsDevelopment())
+{
+    var envFile = Path.Combine(builder.Environment.ContentRootPath, "..", ".env");
+    if (File.Exists(envFile))
+    {
+        var env = new Dictionary<string, string>();
+        foreach (var line in File.ReadAllLines(envFile).Select(l => l.Trim()))
+        {
+            if (line.Length == 0 || line.StartsWith('#') || !line.Contains('=')) continue;
+            var parts = line.Split('=', 2);
+            env[parts[0].Trim()] = parts[1].Trim().Trim('"', '\'');
+        }
+
+        string Require(string key) => env.TryGetValue(key, out var value) && value.Length > 0
+            ? value
+            : throw new InvalidOperationException($"{key} mangler i {Path.GetFullPath(envFile)}.");
+
+        var connection = new NpgsqlConnectionStringBuilder
+        {
+            Host = "localhost",
+            Port = int.Parse(env.GetValueOrDefault("POSTGRES_PORT", "5433")),
+            Database = Require("POSTGRES_DB"),
+            Username = Require("POSTGRES_USER"),
+            Password = Require("POSTGRES_PASSWORD"),
+        };
+
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Default"] = connection.ConnectionString,
+            ["Jwt:Key"] = Require("JWT_KEY"),
+        });
+    }
+}
 
 // Enums serialiseres som strenge. Uden dette bliver de til rå tal i
 // OpenAPI-dokumentet, og frontendens genererede typer bliver "number".
@@ -16,9 +65,18 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddOpenApi();
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+
+// Domain/application exceptions → ProblemDetails (RFC 7807), see ProblemDetailsExceptionHandler.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
+
+// Kun til lokal udvikling. I drift serveres frontend og API fra samme origin via Caddy.
 builder.Services.AddCors(options =>
     options.AddPolicy("frontend", policy => policy
         .WithOrigins("http://localhost:5173")
@@ -26,22 +84,36 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod()
         .AllowCredentials()));
 
-// Både "dotnet build" (OpenAPI-generering) og "dotnet ef" bygger host'en uden
-// at starte den. De kører som Production og indlæser derfor ikke user-secrets.
-// Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
+// Bag Caddy: stol kun på X-Forwarded-* fra proxy-netværket (sættes i compose).
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    var proxyNetwork = builder.Configuration["ReverseProxy:Network"];
+    if (!string.IsNullOrWhiteSpace(proxyNetwork))
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(proxyNetwork));
+});
+
+// /healthz = processen kører, /readyz = processen kan nå databasen.
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
+
+// Både "dotnet build" (OpenAPI-generering), "dotnet ef" og migration bundles bygger
+// host'en uden at starte den. Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
 var isDesignTime = Assembly.GetEntryAssembly() != Assembly.GetExecutingAssembly();
 
-var signingKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(signingKey))
-{
-    if (!isDesignTime)
-    {
-        throw new InvalidOperationException(
-            "Jwt:Key mangler. Kør .\\setup-dev-secrets.ps1 lokalt, " +
-            "eller sæt miljøvariablen Jwt__Key i drift.");
-    }
+// Samme JwtOptions som JwtTokenService bruger, så udstedelse og validering aldrig kan glide fra hinanden.
+var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
-    signingKey = "design-time-placeholder-bruges-aldrig-til-rigtige-tokens";
+if (isDesignTime)
+{
+    if (string.IsNullOrWhiteSpace(jwt.Key))
+        jwt.Key = "design-time-placeholder-bruges-aldrig-til-rigtige-tokens";
+}
+else if (!jwt.IsComplete)
+{
+    throw new InvalidOperationException(
+        "Jwt:Key, Jwt:Issuer og Jwt:Audience skal være sat. Lokalt: opret .env ud fra .env.example, " +
+        "eller sæt Jwt__Key, Jwt__Issuer og Jwt__Audience i drift.");
 }
 
 builder.Services
@@ -51,11 +123,11 @@ builder.Services
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidIssuer = jwt.Issuer,
             ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidAudience = jwt.Audience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30)
         };
@@ -65,16 +137,21 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();                 // dokumentet på /openapi/v1.json
     app.MapScalarApiReference();      // brugerfladen på /scalar/v1
+    app.UseCors("frontend");
 }
 
-app.UseHttpsRedirection();
-app.UseCors("frontend");
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHealthChecks("/healthz", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapControllers();
 
 app.Run();

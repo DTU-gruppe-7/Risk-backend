@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      # EF Core-pakker og dotnet-ef-værktøjet skal altid have samme version
+      efcore:
+        patterns: ["Microsoft.EntityFrameworkCore*", "Npgsql.EntityFrameworkCore*", "dotnet-ef"]
+      aspnetcore:
+        patterns: ["Microsoft.AspNetCore*", "Microsoft.Extensions*"]
+      tests:
+        patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*", "Testcontainers*"]
+    ignore:
+      # Microsoft.AspNetCore.OpenApi 10 kræver Microsoft.OpenApi 2.x
+      - dependency-name: "Microsoft.OpenApi"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    # Dagligt: base-images genbygges med sikkerhedsrettelser, og Trivy i CI fejler på dem
+    schedule:
+      interval: daily
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly

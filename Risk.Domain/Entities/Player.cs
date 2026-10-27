@@ -1,8 +1,12 @@
+using Risk.Domain.Common;
+using Risk.Domain.Exceptions;
+
 namespace Risk.Domain.Entities;
 
 /// <summary>
 /// Represents a user's participation in a single Risk game.
-/// Bridges <see cref="User"/> and <see cref="Game"/>.
+/// Bridges <see cref="User"/> and <see cref="Game"/>. Part of the <see cref="Game"/>
+/// aggregate, so state changes go through the game (hence the internal methods).
 /// </summary>
 public sealed class Player
 {
@@ -28,8 +32,11 @@ public sealed class Player
     // Navigation properties
     public Game? Game { get; private set; }
     public User? User { get; private set; }
-    public BonusCard? BonusCard { get; private set; }
     public MissionCard? MissionCard { get; private set; }
+
+    private readonly List<BonusCard> _bonusCards = [];
+    /// <summary>Bonus cards currently in the player's hand.</summary>
+    public IReadOnlyCollection<BonusCard> BonusCards => _bonusCards.AsReadOnly();
 
     private readonly List<Territory> _territories = [];
     public IReadOnlyCollection<Territory> Territories => _territories.AsReadOnly();
@@ -37,40 +44,29 @@ public sealed class Player
     // EF Core requires a parameterless constructor
     private Player() { }
 
-    public Player(Guid gameId, Guid userId, string color, int turnOrder)
+    internal Player(Guid gameId, Guid userId, string color, int turnOrder)
     {
-        if (gameId == Guid.Empty)
-            throw new ArgumentException("GameId must be a valid GUID.", nameof(gameId));
-        if (userId == Guid.Empty)
-            throw new ArgumentException("UserId must be a valid GUID.", nameof(userId));
-        if (string.IsNullOrWhiteSpace(color))
-            throw new ArgumentException("Color must not be empty.", nameof(color));
-        if (turnOrder < 1)
-            throw new ArgumentOutOfRangeException(nameof(turnOrder), "TurnOrder must be at least 1.");
-
-        GameId = gameId;
-        UserId = userId;
-        Color = color.Trim().ToLowerInvariant();
-        TurnOrder = turnOrder;
+        GameId = Guard.NotEmpty(gameId, nameof(gameId));
+        UserId = Guard.NotEmpty(userId, nameof(userId));
+        Color = Guard.NotBlank(color, nameof(color)).ToLowerInvariant();
+        TurnOrder = Guard.Positive(turnOrder, nameof(turnOrder));
     }
 
-    public void AddReinforcements(int troops)
+    internal void AddReinforcements(int troops)
     {
-        if (troops <= 0)
-            throw new ArgumentOutOfRangeException(nameof(troops), "Troops must be positive.");
-
-        ReinforcementTroops += troops;
+        ReinforcementTroops += Guard.Positive(troops, nameof(troops));
     }
 
-    public void PlaceTroops(int troops)
+    internal void PlaceTroops(int troops)
     {
-        if (troops <= 0 || troops > ReinforcementTroops)
-            throw new InvalidOperationException("Invalid troop placement amount.");
+        Guard.Positive(troops, nameof(troops));
+        if (troops > ReinforcementTroops)
+            throw new BusinessRuleException("Cannot place more troops than the player has in reserve.");
 
         ReinforcementTroops -= troops;
     }
 
-    public void Eliminate()
+    internal void Eliminate()
     {
         IsEliminated = true;
     }

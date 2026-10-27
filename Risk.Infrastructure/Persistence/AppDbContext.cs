@@ -1,28 +1,37 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Risk.Domain.Entities;
+using Risk.Domain.Map;
 using Risk.Infrastructure.Identity;
 
 namespace Risk.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options), IDataProtectionKeyContext
 {
+      public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     // Bemærk navnet: IdentityDbContext har allerede en Users-property til
     // ApplicationUser, så domæne-brugerne får deres eget navn.
     public DbSet<User> DomainUsers           => Set<User>();
     public DbSet<Game> Games                 => Set<Game>();
     public DbSet<GameSetting> GameSettings   => Set<GameSetting>();
     public DbSet<Player> Players             => Set<Player>();
-    public DbSet<Continent> Continents       => Set<Continent>();
     public DbSet<Territory> Territories      => Set<Territory>();
-    public DbSet<TerritoryBorder> TerritoryBorders => Set<TerritoryBorder>();
     public DbSet<BonusCard> BonusCards       => Set<BonusCard>();
     public DbSet<MissionCard> MissionCards   => Set<MissionCard>();
 
+    // Static board (reference data, seeded from ClassicMap)
+    public DbSet<MapContinent> MapContinents => Set<MapContinent>();
+    public DbSet<MapTerritory> MapTerritories => Set<MapTerritory>();
+    public DbSet<MapBorder> MapBorders       => Set<MapBorder>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(builder);
+      base.OnModelCreating(builder);
+
+      builder.Entity<DataProtectionKey>().ToTable("data_protection_keys");
+
 
         // ------------------------------------------------------------------
         // User
@@ -31,7 +40,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("users");
             entity.HasKey(u => u.Id);
-            entity.Property(u => u.DisplayName).HasMaxLength(200).IsRequired();
+            entity.Property(u => u.Username).HasMaxLength(200).IsRequired();
             entity.Property(u => u.Email).HasMaxLength(320).IsRequired();
             entity.Property(u => u.CreatedAt).IsRequired();
             entity.HasIndex(u => u.Email).IsUnique();
@@ -50,6 +59,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("games");
             entity.HasKey(g => g.Id);
+
+            // Two requests changing the same game: the second one fails instead of overwriting.
+            entity.Property(g => g.Version).IsConcurrencyToken();
 
             entity.Property(g => g.State).HasConversion<string>().HasMaxLength(30).IsRequired();
             entity.Property(g => g.CurrentPhase).HasConversion<string>().HasMaxLength(30).IsRequired();
@@ -75,7 +87,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             // Backing fields for IReadOnlyCollection nav properties
             entity.Navigation(g => g.Players).UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.Navigation(g => g.Territories).UsePropertyAccessMode(PropertyAccessMode.Field);
-            entity.Navigation(g => g.Continents).UsePropertyAccessMode(PropertyAccessMode.Field);
 
             entity.HasMany(g => g.Players)
                   .WithOne(p => p.Game)
@@ -106,9 +117,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                   .HasForeignKey(p => p.UserId)
                   .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(p => p.BonusCard)
+            // A player can hold several bonus cards at once
+            entity.Navigation(p => p.BonusCards).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasMany(p => p.BonusCards)
                   .WithOne(b => b.Player)
-                  .HasForeignKey<BonusCard>(b => b.PlayerId)
+                  .HasForeignKey(b => b.PlayerId)
                   .IsRequired(false)
                   .OnDelete(DeleteBehavior.SetNull);
 
@@ -131,29 +144,58 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         });
 
         // ------------------------------------------------------------------
-        // Continent
+        // Static board: seeded with HasData, so every migrated database
+        // contains the map. Change ClassicMap + add a migration to change it.
         // ------------------------------------------------------------------
-        builder.Entity<Continent>(entity =>
+        builder.Entity<MapContinent>(entity =>
         {
-            entity.ToTable("continents");
+            entity.ToTable("map_continents");
             entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).HasMaxLength(100);
             entity.Property(c => c.Name).HasMaxLength(100).IsRequired();
 
-            entity.HasOne(c => c.Game)
-                  .WithMany(g => g.Continents)
-                  .HasForeignKey(c => c.GameId)
-                  .OnDelete(DeleteBehavior.Cascade);
-
             entity.Navigation(c => c.Territories).UsePropertyAccessMode(PropertyAccessMode.Field);
-
             entity.HasMany(c => c.Territories)
                   .WithOne(t => t.Continent)
                   .HasForeignKey(t => t.ContinentId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasData(ClassicMap.Continents);
+        });
+
+        builder.Entity<MapTerritory>(entity =>
+        {
+            entity.ToTable("map_territories");
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Id).HasMaxLength(100);
+            entity.Property(t => t.ContinentId).HasMaxLength(100).IsRequired();
+
+            entity.Navigation(t => t.Borders).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasMany(t => t.Borders)
+                  .WithOne()
+                  .HasForeignKey(b => b.TerritoryId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasData(ClassicMap.Territories);
+        });
+
+        builder.Entity<MapBorder>(entity =>
+        {
+            entity.ToTable("map_borders");
+            entity.HasKey(b => new { b.TerritoryId, b.NeighborId });
+            entity.Property(b => b.TerritoryId).HasMaxLength(100);
+            entity.Property(b => b.NeighborId).HasMaxLength(100);
+
+            entity.HasOne<MapTerritory>()
+                  .WithMany()
+                  .HasForeignKey(b => b.NeighborId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasData(ClassicMap.Borders);
         });
 
         // ------------------------------------------------------------------
-        // Territory
+        // Territory (per-game state of a map territory)
         // ------------------------------------------------------------------
         builder.Entity<Territory>(entity =>
         {
@@ -161,34 +203,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Identifier).HasMaxLength(100).IsRequired();
 
-            // Shadow property so Territory belongs to a Game (matches existing migration)
-            entity.Property<Guid>("GameId");
-
-            entity.Navigation(t => t.Neighbors).UsePropertyAccessMode(PropertyAccessMode.Field);
-
-            entity.HasOne<Game>()
+            entity.HasOne(t => t.Game)
                   .WithMany(g => g.Territories)
-                  .HasForeignKey("GameId")
-                  .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // ------------------------------------------------------------------
-        // TerritoryBorder (composite-key join table)
-        // ------------------------------------------------------------------
-        builder.Entity<TerritoryBorder>(entity =>
-        {
-            entity.ToTable("territory_borders");
-            entity.HasKey(tb => new { tb.TerritoryId, tb.BorderingTerritoryId });
-
-            entity.HasOne(tb => tb.Territory)
-                  .WithMany()
-                  .HasForeignKey(tb => tb.TerritoryId)
+                  .HasForeignKey(t => t.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(tb => tb.BorderingTerritory)
+            // Every row must point at a real map territory
+            entity.HasOne<MapTerritory>()
                   .WithMany()
-                  .HasForeignKey(tb => tb.BorderingTerritoryId)
+                  .HasForeignKey(t => t.Identifier)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            // A map territory appears once per game
+            entity.HasIndex(t => new { t.GameId, t.Identifier }).IsUnique();
         });
 
         // ------------------------------------------------------------------
@@ -200,6 +227,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(b => b.Id);
             entity.Property(b => b.Type).HasConversion<string>().HasMaxLength(20);
             entity.Property(b => b.TerritoryIdentifier).HasMaxLength(100);
+
+            // Wild cards have no territory; the rest must depict a real one
+            entity.HasOne<MapTerritory>()
+                  .WithMany()
+                  .HasForeignKey(b => b.TerritoryIdentifier)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(b => b.Game)
                   .WithMany()
@@ -222,5 +256,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                   .HasForeignKey(m => m.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
+
+        // ------------------------------------------------------------------
+        // Ids are generated by the domain (Guid.CreateVersion7), never by EF.
+        // Without this, an entity added through a navigation (game.AddPlayer)
+        // already has a key, so EF would treat it as existing and UPDATE it.
+        // ------------------------------------------------------------------
+        builder.Entity<User>().Property(e => e.Id).ValueGeneratedNever();
+        builder.Entity<Game>().Property(e => e.Id).ValueGeneratedNever();
+        builder.Entity<GameSetting>().Property(e => e.Id).ValueGeneratedNever();
+        builder.Entity<Player>().Property(e => e.Id).ValueGeneratedNever();
+        builder.Entity<Territory>().Property(e => e.Id).ValueGeneratedNever();
+        builder.Entity<BonusCard>().Property(e => e.Id).ValueGeneratedNever();
+        builder.Entity<MissionCard>().Property(e => e.Id).ValueGeneratedNever();
     }
 }

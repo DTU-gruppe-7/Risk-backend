@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Player's state changes are internal (only Game may call them); tests exercise them through Game -->
+    <InternalsVisibleTo Include="Risk.Tests" />
+  </ItemGroup>
+
 </Project>

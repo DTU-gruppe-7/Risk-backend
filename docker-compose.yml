@@ -1,4 +1,18 @@
-﻿services:
+﻿# Lokal udvikling. Samme flow som på serveren: db → migrator (engangs) → api.
+#
+#   docker compose up -d --build           hele backenden i Docker (API på :5081)
+#   docker compose up -d --build migrator  kun db + migrationer, kør så API'et med dotnet watch
+
+# Samme hærdning som i drift, så fejl som skrivning til et read-only filsystem opdages lokalt
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: [/tmp]
+
+x-db-connection: &db-connection Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+
+services:
   db:
     image: postgres:17-alpine
     container_name: risk-postgres-db
@@ -7,7 +21,7 @@
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER mangler i miljøet eller .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD mangler i miljøet eller .env}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -19,21 +33,40 @@
       - risk-network
     restart: unless-stopped
 
-  api:
+  # EF migration bundle fra Dockerfilens migrator-target. Kører én gang og stopper.
+  migrator:
+    <<: *hardening
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: risk-api-server
+      target: migrator
+    image: risk-migrator:local
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ConnectionStrings__Default=Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      - Jwt__Key=${JWT_KEY:?JWT_KEY mangler i miljøet eller .env}
-    ports:
-      - "5000:8080"
+      ConnectionStrings__Default: *db-connection
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - risk-network
+    restart: "no"
+
+  api:
+    <<: *hardening
+    build:
+      context: .
+      target: api
+    image: risk-api:local
+    container_name: risk-api-server
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Default: *db-connection
+      Jwt__Key: ${JWT_KEY:?JWT_KEY mangler i miljøet eller .env}
+    # Samme port som "dotnet run", så frontendens Vite-proxy virker uden ekstra konfiguration
+    ports:
+      - "127.0.0.1:5081:8080"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
     networks:
       - risk-network
 

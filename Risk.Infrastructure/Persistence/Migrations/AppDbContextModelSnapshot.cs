@@ -17,10 +17,29 @@ namespace Risk.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("data_protection_keys", (string)null);
+                });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
@@ -128,7 +147,6 @@ namespace Risk.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Risk.Domain.Entities.BonusCard", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("GameId")
@@ -138,10 +156,13 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("TerritoryIdentifier")
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("Used")
                         .HasColumnType("boolean");
@@ -150,40 +171,16 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GameId");
 
-                    b.HasIndex("PlayerId")
-                        .IsUnique();
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("TerritoryIdentifier");
 
                     b.ToTable("bonus_cards", (string)null);
-                });
-
-            modelBuilder.Entity("Risk.Domain.Entities.Continent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("CaptureBonus")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("GameId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameId");
-
-                    b.ToTable("continents", (string)null);
                 });
 
             modelBuilder.Entity("Risk.Domain.Entities.Game", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -211,6 +208,10 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CurrentPlayerId");
@@ -223,8 +224,10 @@ namespace Risk.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Risk.Domain.Entities.GameSetting", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<int>("BlizzardCount")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("GameId")
                         .HasColumnType("uuid");
@@ -249,18 +252,18 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.HasIndex("GameId")
                         .IsUnique();
 
-                    b.ToTable("GameSetting");
+                    b.ToTable("game_settings", (string)null);
                 });
 
             modelBuilder.Entity("Risk.Domain.Entities.MissionCard", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<Guid>("GameId")
                         .HasColumnType("uuid");
@@ -273,7 +276,8 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
@@ -288,7 +292,6 @@ namespace Risk.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Risk.Domain.Entities.Player", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Color")
@@ -327,19 +330,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Risk.Domain.Entities.Territory", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("Active")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("ContinentId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("GameId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("GameId1")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Identifier")
@@ -347,10 +340,10 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid?>("OwnerId")
-                        .HasColumnType("uuid");
+                    b.Property<bool>("IsBlizzard")
+                        .HasColumnType("boolean");
 
-                    b.Property<Guid?>("TerritoryId")
+                    b.Property<Guid?>("OwnerId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("TroopCount")
@@ -358,52 +351,33 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ContinentId");
-
-                    b.HasIndex("GameId");
-
-                    b.HasIndex("GameId1");
+                    b.HasIndex("Identifier");
 
                     b.HasIndex("OwnerId");
 
-                    b.HasIndex("TerritoryId");
+                    b.HasIndex("GameId", "Identifier")
+                        .IsUnique();
 
                     b.ToTable("territories", (string)null);
-                });
-
-            modelBuilder.Entity("Risk.Domain.Entities.TerritoryBorder", b =>
-                {
-                    b.Property<Guid>("TerritoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("BorderingTerritoryId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("TerritoryId", "BorderingTerritoryId");
-
-                    b.HasIndex("BorderingTerritoryId");
-
-                    b.ToTable("territory_borders", (string)null);
                 });
 
             modelBuilder.Entity("Risk.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
@@ -411,6 +385,1142 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("Risk.Domain.Map.MapBorder", b =>
+                {
+                    b.Property<string>("TerritoryId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NeighborId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("TerritoryId", "NeighborId");
+
+                    b.HasIndex("NeighborId");
+
+                    b.ToTable("map_borders", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            TerritoryId = "alaska",
+                            NeighborId = "northwest-territory"
+                        },
+                        new
+                        {
+                            TerritoryId = "alaska",
+                            NeighborId = "alberta"
+                        },
+                        new
+                        {
+                            TerritoryId = "alaska",
+                            NeighborId = "kamchatka"
+                        },
+                        new
+                        {
+                            TerritoryId = "northwest-territory",
+                            NeighborId = "alaska"
+                        },
+                        new
+                        {
+                            TerritoryId = "northwest-territory",
+                            NeighborId = "alberta"
+                        },
+                        new
+                        {
+                            TerritoryId = "northwest-territory",
+                            NeighborId = "ontario"
+                        },
+                        new
+                        {
+                            TerritoryId = "northwest-territory",
+                            NeighborId = "greenland"
+                        },
+                        new
+                        {
+                            TerritoryId = "greenland",
+                            NeighborId = "northwest-territory"
+                        },
+                        new
+                        {
+                            TerritoryId = "greenland",
+                            NeighborId = "ontario"
+                        },
+                        new
+                        {
+                            TerritoryId = "greenland",
+                            NeighborId = "quebec"
+                        },
+                        new
+                        {
+                            TerritoryId = "greenland",
+                            NeighborId = "iceland"
+                        },
+                        new
+                        {
+                            TerritoryId = "alberta",
+                            NeighborId = "alaska"
+                        },
+                        new
+                        {
+                            TerritoryId = "alberta",
+                            NeighborId = "northwest-territory"
+                        },
+                        new
+                        {
+                            TerritoryId = "alberta",
+                            NeighborId = "ontario"
+                        },
+                        new
+                        {
+                            TerritoryId = "alberta",
+                            NeighborId = "western-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "ontario",
+                            NeighborId = "northwest-territory"
+                        },
+                        new
+                        {
+                            TerritoryId = "ontario",
+                            NeighborId = "alberta"
+                        },
+                        new
+                        {
+                            TerritoryId = "ontario",
+                            NeighborId = "western-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "ontario",
+                            NeighborId = "eastern-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "ontario",
+                            NeighborId = "quebec"
+                        },
+                        new
+                        {
+                            TerritoryId = "ontario",
+                            NeighborId = "greenland"
+                        },
+                        new
+                        {
+                            TerritoryId = "quebec",
+                            NeighborId = "ontario"
+                        },
+                        new
+                        {
+                            TerritoryId = "quebec",
+                            NeighborId = "eastern-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "quebec",
+                            NeighborId = "greenland"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-united-states",
+                            NeighborId = "alberta"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-united-states",
+                            NeighborId = "ontario"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-united-states",
+                            NeighborId = "eastern-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-united-states",
+                            NeighborId = "central-america"
+                        },
+                        new
+                        {
+                            TerritoryId = "eastern-united-states",
+                            NeighborId = "western-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "eastern-united-states",
+                            NeighborId = "ontario"
+                        },
+                        new
+                        {
+                            TerritoryId = "eastern-united-states",
+                            NeighborId = "quebec"
+                        },
+                        new
+                        {
+                            TerritoryId = "eastern-united-states",
+                            NeighborId = "central-america"
+                        },
+                        new
+                        {
+                            TerritoryId = "central-america",
+                            NeighborId = "western-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "central-america",
+                            NeighborId = "eastern-united-states"
+                        },
+                        new
+                        {
+                            TerritoryId = "central-america",
+                            NeighborId = "venezuela"
+                        },
+                        new
+                        {
+                            TerritoryId = "venezuela",
+                            NeighborId = "central-america"
+                        },
+                        new
+                        {
+                            TerritoryId = "venezuela",
+                            NeighborId = "peru"
+                        },
+                        new
+                        {
+                            TerritoryId = "venezuela",
+                            NeighborId = "brazil"
+                        },
+                        new
+                        {
+                            TerritoryId = "peru",
+                            NeighborId = "venezuela"
+                        },
+                        new
+                        {
+                            TerritoryId = "peru",
+                            NeighborId = "brazil"
+                        },
+                        new
+                        {
+                            TerritoryId = "peru",
+                            NeighborId = "argentina"
+                        },
+                        new
+                        {
+                            TerritoryId = "brazil",
+                            NeighborId = "venezuela"
+                        },
+                        new
+                        {
+                            TerritoryId = "brazil",
+                            NeighborId = "peru"
+                        },
+                        new
+                        {
+                            TerritoryId = "brazil",
+                            NeighborId = "argentina"
+                        },
+                        new
+                        {
+                            TerritoryId = "brazil",
+                            NeighborId = "north-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "argentina",
+                            NeighborId = "peru"
+                        },
+                        new
+                        {
+                            TerritoryId = "argentina",
+                            NeighborId = "brazil"
+                        },
+                        new
+                        {
+                            TerritoryId = "iceland",
+                            NeighborId = "greenland"
+                        },
+                        new
+                        {
+                            TerritoryId = "iceland",
+                            NeighborId = "great-britain"
+                        },
+                        new
+                        {
+                            TerritoryId = "iceland",
+                            NeighborId = "scandinavia"
+                        },
+                        new
+                        {
+                            TerritoryId = "great-britain",
+                            NeighborId = "iceland"
+                        },
+                        new
+                        {
+                            TerritoryId = "great-britain",
+                            NeighborId = "scandinavia"
+                        },
+                        new
+                        {
+                            TerritoryId = "great-britain",
+                            NeighborId = "northern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "great-britain",
+                            NeighborId = "western-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "scandinavia",
+                            NeighborId = "iceland"
+                        },
+                        new
+                        {
+                            TerritoryId = "scandinavia",
+                            NeighborId = "great-britain"
+                        },
+                        new
+                        {
+                            TerritoryId = "scandinavia",
+                            NeighborId = "northern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "scandinavia",
+                            NeighborId = "ukraine"
+                        },
+                        new
+                        {
+                            TerritoryId = "northern-europe",
+                            NeighborId = "great-britain"
+                        },
+                        new
+                        {
+                            TerritoryId = "northern-europe",
+                            NeighborId = "scandinavia"
+                        },
+                        new
+                        {
+                            TerritoryId = "northern-europe",
+                            NeighborId = "ukraine"
+                        },
+                        new
+                        {
+                            TerritoryId = "northern-europe",
+                            NeighborId = "southern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "northern-europe",
+                            NeighborId = "western-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-europe",
+                            NeighborId = "great-britain"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-europe",
+                            NeighborId = "northern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-europe",
+                            NeighborId = "southern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-europe",
+                            NeighborId = "north-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "southern-europe",
+                            NeighborId = "western-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "southern-europe",
+                            NeighborId = "northern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "southern-europe",
+                            NeighborId = "ukraine"
+                        },
+                        new
+                        {
+                            TerritoryId = "southern-europe",
+                            NeighborId = "middle-east"
+                        },
+                        new
+                        {
+                            TerritoryId = "southern-europe",
+                            NeighborId = "egypt"
+                        },
+                        new
+                        {
+                            TerritoryId = "southern-europe",
+                            NeighborId = "north-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "ukraine",
+                            NeighborId = "scandinavia"
+                        },
+                        new
+                        {
+                            TerritoryId = "ukraine",
+                            NeighborId = "northern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "ukraine",
+                            NeighborId = "southern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "ukraine",
+                            NeighborId = "middle-east"
+                        },
+                        new
+                        {
+                            TerritoryId = "ukraine",
+                            NeighborId = "afghanistan"
+                        },
+                        new
+                        {
+                            TerritoryId = "ukraine",
+                            NeighborId = "ural"
+                        },
+                        new
+                        {
+                            TerritoryId = "north-africa",
+                            NeighborId = "brazil"
+                        },
+                        new
+                        {
+                            TerritoryId = "north-africa",
+                            NeighborId = "western-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "north-africa",
+                            NeighborId = "southern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "north-africa",
+                            NeighborId = "egypt"
+                        },
+                        new
+                        {
+                            TerritoryId = "north-africa",
+                            NeighborId = "east-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "north-africa",
+                            NeighborId = "congo"
+                        },
+                        new
+                        {
+                            TerritoryId = "egypt",
+                            NeighborId = "north-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "egypt",
+                            NeighborId = "southern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "egypt",
+                            NeighborId = "middle-east"
+                        },
+                        new
+                        {
+                            TerritoryId = "egypt",
+                            NeighborId = "east-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "east-africa",
+                            NeighborId = "egypt"
+                        },
+                        new
+                        {
+                            TerritoryId = "east-africa",
+                            NeighborId = "north-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "east-africa",
+                            NeighborId = "congo"
+                        },
+                        new
+                        {
+                            TerritoryId = "east-africa",
+                            NeighborId = "south-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "east-africa",
+                            NeighborId = "madagascar"
+                        },
+                        new
+                        {
+                            TerritoryId = "east-africa",
+                            NeighborId = "middle-east"
+                        },
+                        new
+                        {
+                            TerritoryId = "congo",
+                            NeighborId = "north-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "congo",
+                            NeighborId = "east-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "congo",
+                            NeighborId = "south-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "south-africa",
+                            NeighborId = "congo"
+                        },
+                        new
+                        {
+                            TerritoryId = "south-africa",
+                            NeighborId = "east-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "south-africa",
+                            NeighborId = "madagascar"
+                        },
+                        new
+                        {
+                            TerritoryId = "madagascar",
+                            NeighborId = "south-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "madagascar",
+                            NeighborId = "east-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "ural",
+                            NeighborId = "ukraine"
+                        },
+                        new
+                        {
+                            TerritoryId = "ural",
+                            NeighborId = "siberia"
+                        },
+                        new
+                        {
+                            TerritoryId = "ural",
+                            NeighborId = "china"
+                        },
+                        new
+                        {
+                            TerritoryId = "ural",
+                            NeighborId = "afghanistan"
+                        },
+                        new
+                        {
+                            TerritoryId = "siberia",
+                            NeighborId = "ural"
+                        },
+                        new
+                        {
+                            TerritoryId = "siberia",
+                            NeighborId = "yakutsk"
+                        },
+                        new
+                        {
+                            TerritoryId = "siberia",
+                            NeighborId = "irkutsk"
+                        },
+                        new
+                        {
+                            TerritoryId = "siberia",
+                            NeighborId = "mongolia"
+                        },
+                        new
+                        {
+                            TerritoryId = "siberia",
+                            NeighborId = "china"
+                        },
+                        new
+                        {
+                            TerritoryId = "yakutsk",
+                            NeighborId = "siberia"
+                        },
+                        new
+                        {
+                            TerritoryId = "yakutsk",
+                            NeighborId = "kamchatka"
+                        },
+                        new
+                        {
+                            TerritoryId = "yakutsk",
+                            NeighborId = "irkutsk"
+                        },
+                        new
+                        {
+                            TerritoryId = "kamchatka",
+                            NeighborId = "yakutsk"
+                        },
+                        new
+                        {
+                            TerritoryId = "kamchatka",
+                            NeighborId = "irkutsk"
+                        },
+                        new
+                        {
+                            TerritoryId = "kamchatka",
+                            NeighborId = "mongolia"
+                        },
+                        new
+                        {
+                            TerritoryId = "kamchatka",
+                            NeighborId = "japan"
+                        },
+                        new
+                        {
+                            TerritoryId = "kamchatka",
+                            NeighborId = "alaska"
+                        },
+                        new
+                        {
+                            TerritoryId = "irkutsk",
+                            NeighborId = "siberia"
+                        },
+                        new
+                        {
+                            TerritoryId = "irkutsk",
+                            NeighborId = "yakutsk"
+                        },
+                        new
+                        {
+                            TerritoryId = "irkutsk",
+                            NeighborId = "kamchatka"
+                        },
+                        new
+                        {
+                            TerritoryId = "irkutsk",
+                            NeighborId = "mongolia"
+                        },
+                        new
+                        {
+                            TerritoryId = "mongolia",
+                            NeighborId = "siberia"
+                        },
+                        new
+                        {
+                            TerritoryId = "mongolia",
+                            NeighborId = "irkutsk"
+                        },
+                        new
+                        {
+                            TerritoryId = "mongolia",
+                            NeighborId = "kamchatka"
+                        },
+                        new
+                        {
+                            TerritoryId = "mongolia",
+                            NeighborId = "japan"
+                        },
+                        new
+                        {
+                            TerritoryId = "mongolia",
+                            NeighborId = "china"
+                        },
+                        new
+                        {
+                            TerritoryId = "japan",
+                            NeighborId = "kamchatka"
+                        },
+                        new
+                        {
+                            TerritoryId = "japan",
+                            NeighborId = "mongolia"
+                        },
+                        new
+                        {
+                            TerritoryId = "afghanistan",
+                            NeighborId = "ukraine"
+                        },
+                        new
+                        {
+                            TerritoryId = "afghanistan",
+                            NeighborId = "ural"
+                        },
+                        new
+                        {
+                            TerritoryId = "afghanistan",
+                            NeighborId = "china"
+                        },
+                        new
+                        {
+                            TerritoryId = "afghanistan",
+                            NeighborId = "india"
+                        },
+                        new
+                        {
+                            TerritoryId = "afghanistan",
+                            NeighborId = "middle-east"
+                        },
+                        new
+                        {
+                            TerritoryId = "china",
+                            NeighborId = "afghanistan"
+                        },
+                        new
+                        {
+                            TerritoryId = "china",
+                            NeighborId = "ural"
+                        },
+                        new
+                        {
+                            TerritoryId = "china",
+                            NeighborId = "siberia"
+                        },
+                        new
+                        {
+                            TerritoryId = "china",
+                            NeighborId = "mongolia"
+                        },
+                        new
+                        {
+                            TerritoryId = "china",
+                            NeighborId = "siam"
+                        },
+                        new
+                        {
+                            TerritoryId = "china",
+                            NeighborId = "india"
+                        },
+                        new
+                        {
+                            TerritoryId = "middle-east",
+                            NeighborId = "ukraine"
+                        },
+                        new
+                        {
+                            TerritoryId = "middle-east",
+                            NeighborId = "southern-europe"
+                        },
+                        new
+                        {
+                            TerritoryId = "middle-east",
+                            NeighborId = "egypt"
+                        },
+                        new
+                        {
+                            TerritoryId = "middle-east",
+                            NeighborId = "east-africa"
+                        },
+                        new
+                        {
+                            TerritoryId = "middle-east",
+                            NeighborId = "india"
+                        },
+                        new
+                        {
+                            TerritoryId = "middle-east",
+                            NeighborId = "afghanistan"
+                        },
+                        new
+                        {
+                            TerritoryId = "india",
+                            NeighborId = "middle-east"
+                        },
+                        new
+                        {
+                            TerritoryId = "india",
+                            NeighborId = "afghanistan"
+                        },
+                        new
+                        {
+                            TerritoryId = "india",
+                            NeighborId = "china"
+                        },
+                        new
+                        {
+                            TerritoryId = "india",
+                            NeighborId = "siam"
+                        },
+                        new
+                        {
+                            TerritoryId = "siam",
+                            NeighborId = "india"
+                        },
+                        new
+                        {
+                            TerritoryId = "siam",
+                            NeighborId = "china"
+                        },
+                        new
+                        {
+                            TerritoryId = "siam",
+                            NeighborId = "indonesia"
+                        },
+                        new
+                        {
+                            TerritoryId = "indonesia",
+                            NeighborId = "siam"
+                        },
+                        new
+                        {
+                            TerritoryId = "indonesia",
+                            NeighborId = "new-guinea"
+                        },
+                        new
+                        {
+                            TerritoryId = "indonesia",
+                            NeighborId = "western-australia"
+                        },
+                        new
+                        {
+                            TerritoryId = "new-guinea",
+                            NeighborId = "indonesia"
+                        },
+                        new
+                        {
+                            TerritoryId = "new-guinea",
+                            NeighborId = "western-australia"
+                        },
+                        new
+                        {
+                            TerritoryId = "new-guinea",
+                            NeighborId = "eastern-australia"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-australia",
+                            NeighborId = "indonesia"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-australia",
+                            NeighborId = "new-guinea"
+                        },
+                        new
+                        {
+                            TerritoryId = "western-australia",
+                            NeighborId = "eastern-australia"
+                        },
+                        new
+                        {
+                            TerritoryId = "eastern-australia",
+                            NeighborId = "new-guinea"
+                        },
+                        new
+                        {
+                            TerritoryId = "eastern-australia",
+                            NeighborId = "western-australia"
+                        });
+                });
+
+            modelBuilder.Entity("Risk.Domain.Map.MapContinent", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("CaptureBonus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("map_continents", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "north-america",
+                            CaptureBonus = 5,
+                            Name = "North America"
+                        },
+                        new
+                        {
+                            Id = "south-america",
+                            CaptureBonus = 2,
+                            Name = "South America"
+                        },
+                        new
+                        {
+                            Id = "europe",
+                            CaptureBonus = 5,
+                            Name = "Europe"
+                        },
+                        new
+                        {
+                            Id = "africa",
+                            CaptureBonus = 3,
+                            Name = "Africa"
+                        },
+                        new
+                        {
+                            Id = "asia",
+                            CaptureBonus = 7,
+                            Name = "Asia"
+                        },
+                        new
+                        {
+                            Id = "australia",
+                            CaptureBonus = 2,
+                            Name = "Australia"
+                        });
+                });
+
+            modelBuilder.Entity("Risk.Domain.Map.MapTerritory", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ContinentId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContinentId");
+
+                    b.ToTable("map_territories", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "alaska",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "alberta",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "central-america",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "eastern-united-states",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "greenland",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "northwest-territory",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "ontario",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "quebec",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "western-united-states",
+                            ContinentId = "north-america"
+                        },
+                        new
+                        {
+                            Id = "argentina",
+                            ContinentId = "south-america"
+                        },
+                        new
+                        {
+                            Id = "brazil",
+                            ContinentId = "south-america"
+                        },
+                        new
+                        {
+                            Id = "venezuela",
+                            ContinentId = "south-america"
+                        },
+                        new
+                        {
+                            Id = "peru",
+                            ContinentId = "south-america"
+                        },
+                        new
+                        {
+                            Id = "great-britain",
+                            ContinentId = "europe"
+                        },
+                        new
+                        {
+                            Id = "iceland",
+                            ContinentId = "europe"
+                        },
+                        new
+                        {
+                            Id = "northern-europe",
+                            ContinentId = "europe"
+                        },
+                        new
+                        {
+                            Id = "scandinavia",
+                            ContinentId = "europe"
+                        },
+                        new
+                        {
+                            Id = "southern-europe",
+                            ContinentId = "europe"
+                        },
+                        new
+                        {
+                            Id = "ukraine",
+                            ContinentId = "europe"
+                        },
+                        new
+                        {
+                            Id = "western-europe",
+                            ContinentId = "europe"
+                        },
+                        new
+                        {
+                            Id = "congo",
+                            ContinentId = "africa"
+                        },
+                        new
+                        {
+                            Id = "east-africa",
+                            ContinentId = "africa"
+                        },
+                        new
+                        {
+                            Id = "egypt",
+                            ContinentId = "africa"
+                        },
+                        new
+                        {
+                            Id = "madagascar",
+                            ContinentId = "africa"
+                        },
+                        new
+                        {
+                            Id = "north-africa",
+                            ContinentId = "africa"
+                        },
+                        new
+                        {
+                            Id = "south-africa",
+                            ContinentId = "africa"
+                        },
+                        new
+                        {
+                            Id = "afghanistan",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "china",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "india",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "irkutsk",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "japan",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "kamchatka",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "middle-east",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "mongolia",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "siam",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "siberia",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "ural",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "yakutsk",
+                            ContinentId = "asia"
+                        },
+                        new
+                        {
+                            Id = "eastern-australia",
+                            ContinentId = "australia"
+                        },
+                        new
+                        {
+                            Id = "new-guinea",
+                            ContinentId = "australia"
+                        },
+                        new
+                        {
+                            Id = "indonesia",
+                            ContinentId = "australia"
+                        },
+                        new
+                        {
+                            Id = "western-australia",
+                            ContinentId = "australia"
+                        });
                 });
 
             modelBuilder.Entity("Risk.Infrastructure.Identity.ApplicationRole", b =>
@@ -571,23 +1681,18 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.HasOne("Risk.Domain.Entities.Player", "Player")
-                        .WithOne("BonusCard")
-                        .HasForeignKey("Risk.Domain.Entities.BonusCard", "PlayerId");
+                        .WithMany("BonusCards")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Risk.Domain.Map.MapTerritory", null)
+                        .WithMany()
+                        .HasForeignKey("TerritoryIdentifier")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Game");
 
                     b.Navigation("Player");
-                });
-
-            modelBuilder.Entity("Risk.Domain.Entities.Continent", b =>
-                {
-                    b.HasOne("Risk.Domain.Entities.Game", "Game")
-                        .WithMany("Continents")
-                        .HasForeignKey("GameId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Game");
                 });
 
             modelBuilder.Entity("Risk.Domain.Entities.Game", b =>
@@ -625,7 +1730,8 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.HasOne("Risk.Domain.Entities.Player", "Player")
                         .WithOne("MissionCard")
-                        .HasForeignKey("Risk.Domain.Entities.MissionCard", "PlayerId");
+                        .HasForeignKey("Risk.Domain.Entities.MissionCard", "PlayerId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Game");
 
@@ -653,55 +1759,52 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Risk.Domain.Entities.Territory", b =>
                 {
-                    b.HasOne("Risk.Domain.Entities.Continent", "Continent")
-                        .WithMany("Territories")
-                        .HasForeignKey("ContinentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Risk.Domain.Entities.Game", null)
+                    b.HasOne("Risk.Domain.Entities.Game", "Game")
                         .WithMany("Territories")
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Risk.Domain.Entities.Game", "Game")
+                    b.HasOne("Risk.Domain.Map.MapTerritory", null)
                         .WithMany()
-                        .HasForeignKey("GameId1");
+                        .HasForeignKey("Identifier")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Risk.Domain.Entities.Player", "Owner")
                         .WithMany("Territories")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Risk.Domain.Entities.Territory", null)
-                        .WithMany("Neighbors")
-                        .HasForeignKey("TerritoryId");
-
-                    b.Navigation("Continent");
-
                     b.Navigation("Game");
 
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("Risk.Domain.Entities.TerritoryBorder", b =>
+            modelBuilder.Entity("Risk.Domain.Map.MapBorder", b =>
                 {
-                    b.HasOne("Risk.Domain.Entities.Territory", "BorderingTerritory")
+                    b.HasOne("Risk.Domain.Map.MapTerritory", null)
                         .WithMany()
-                        .HasForeignKey("BorderingTerritoryId")
+                        .HasForeignKey("NeighborId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Risk.Domain.Entities.Territory", "Territory")
-                        .WithMany()
+                    b.HasOne("Risk.Domain.Map.MapTerritory", null)
+                        .WithMany("Borders")
                         .HasForeignKey("TerritoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
 
-                    b.Navigation("BorderingTerritory");
+            modelBuilder.Entity("Risk.Domain.Map.MapTerritory", b =>
+                {
+                    b.HasOne("Risk.Domain.Map.MapContinent", "Continent")
+                        .WithMany("Territories")
+                        .HasForeignKey("ContinentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
-                    b.Navigation("Territory");
+                    b.Navigation("Continent");
                 });
 
             modelBuilder.Entity("Risk.Infrastructure.Identity.ApplicationUser", b =>
@@ -713,15 +1816,8 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Risk.Domain.Entities.Continent", b =>
-                {
-                    b.Navigation("Territories");
-                });
-
             modelBuilder.Entity("Risk.Domain.Entities.Game", b =>
                 {
-                    b.Navigation("Continents");
-
                     b.Navigation("Players");
 
                     b.Navigation("Settings");
@@ -731,16 +1827,21 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Risk.Domain.Entities.Player", b =>
                 {
-                    b.Navigation("BonusCard");
+                    b.Navigation("BonusCards");
 
                     b.Navigation("MissionCard");
 
                     b.Navigation("Territories");
                 });
 
-            modelBuilder.Entity("Risk.Domain.Entities.Territory", b =>
+            modelBuilder.Entity("Risk.Domain.Map.MapContinent", b =>
                 {
-                    b.Navigation("Neighbors");
+                    b.Navigation("Territories");
+                });
+
+            modelBuilder.Entity("Risk.Domain.Map.MapTerritory", b =>
+                {
+                    b.Navigation("Borders");
                 });
 #pragma warning restore 612, 618
         }

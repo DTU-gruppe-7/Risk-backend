@@ -1,14 +1,23 @@
+using Risk.Domain.Common;
+using Risk.Domain.Exceptions;
+using Risk.Domain.Map;
+
 namespace Risk.Domain.Entities;
 
 /// <summary>
-/// A named region on the Risk board that can be owned by a player
-/// and occupied by troops.
+/// One territory's state in one game: owner, troops and whether it is a blizzard.
+/// What the territory is (continent, neighbours) comes from the static map,
+/// see <see cref="MapTerritory"/>, referenced by <see cref="Identifier"/>.
+/// Rules that involve several territories live in <see cref="GameBoard"/>.
 /// </summary>
 public sealed class Territory
 {
     public Guid Id { get; private set; } = Guid.CreateVersion7();
 
-    public Guid ContinentId { get; private set; }
+    public Guid GameId { get; private set; }
+
+    /// <summary>The map territory this row is the state of (e.g. "north-africa").</summary>
+    public string Identifier { get; private set; } = string.Empty;
 
     /// <summary>
     /// The player who currently controls this territory.
@@ -20,76 +29,79 @@ public sealed class Territory
     public int TroopCount { get; private set; } = 0;
 
     /// <summary>
-    /// Stable, human-readable identifier for the territory (e.g. "north-africa").
-    /// Used to reference the territory independently of its GUID.
+    /// Blizzard game mode: the territory is impassable for the whole game. It cannot be
+    /// owned, reinforced, attacked or moved through, and does not count towards continent
+    /// bonuses. Decided when the game starts and never changes afterwards.
     /// </summary>
-    public string Identifier { get; private set; } = string.Empty;
-
-    /// <summary>Whether the territory is active/visible in the current game.</summary>
-    public bool Active { get; private set; } = true;
+    public bool IsBlizzard { get; private set; }
 
     // Navigation properties
-    public Continent? Continent { get; private set; }
+    public Game? Game { get; private set; }
     public Player? Owner { get; private set; }
-
-    private readonly List<Territory> _neighbors = [];
-    /// <summary>Territories that share a border with this one.</summary>
-    public IReadOnlyCollection<Territory> Neighbors => _neighbors.AsReadOnly();
 
     // EF Core requires a parameterless constructor
     private Territory() { }
 
-    public Territory(Guid continentId, string identifier)
+    public Territory(Guid gameId, string identifier)
     {
-        if (continentId == Guid.Empty)
-            throw new ArgumentException("ContinentId must be a valid GUID.", nameof(continentId));
-        if (string.IsNullOrWhiteSpace(identifier))
-            throw new ArgumentException("Identifier must not be empty.", nameof(identifier));
-
-        ContinentId = continentId;
-        Identifier = identifier.Trim().ToLowerInvariant();
+        GameId = Guard.NotEmpty(gameId, nameof(gameId));
+        Identifier = Guard.NotBlank(identifier, nameof(identifier)).ToLowerInvariant();
     }
 
     public void Claim(Guid playerId, int initialTroops = 1)
     {
-        if (playerId == Guid.Empty)
-            throw new ArgumentException("PlayerId must be a valid GUID.", nameof(playerId));
-        if (initialTroops < 1)
-            throw new ArgumentOutOfRangeException(nameof(initialTroops), "Must place at least 1 troop.");
+        Guard.NotEmpty(playerId, nameof(playerId));
+        Guard.Positive(initialTroops, nameof(initialTroops));
+        EnsureNotBlizzard();
+        if (OwnerId.HasValue)
+            throw new BusinessRuleException("The territory is already occupied.");
 
         OwnerId = playerId;
         TroopCount = initialTroops;
     }
 
+    /// <summary>Adds troops for a positive delta and removes them for a negative one.</summary>
+    public void AdjustTroops(int delta)
+    {
+        if (delta > 0) AddTroops(delta);
+        else if (delta < 0) RemoveTroops(-delta);
+    }
+
     public void AddTroops(int count)
     {
-        if (count <= 0)
-            throw new ArgumentOutOfRangeException(nameof(count), "Count must be positive.");
-
+        Guard.Positive(count, nameof(count));
+        EnsureNotBlizzard();
         TroopCount += count;
     }
 
     public void RemoveTroops(int count)
     {
-        if (count <= 0 || count > TroopCount)
-            throw new InvalidOperationException("Invalid troop removal amount.");
+        Guard.Positive(count, nameof(count));
+        if (count > TroopCount)
+            throw new BusinessRuleException("Cannot remove more troops than are stationed in the territory.");
 
         TroopCount -= count;
     }
 
     public void TransferOwnership(Guid newOwnerId, int remainingTroops)
     {
-        if (newOwnerId == Guid.Empty)
-            throw new ArgumentException("NewOwnerId must be a valid GUID.", nameof(newOwnerId));
-        if (remainingTroops < 1)
-            throw new ArgumentOutOfRangeException(nameof(remainingTroops), "Must have at least 1 troop after transfer.");
-
-        OwnerId = newOwnerId;
-        TroopCount = remainingTroops;
+        EnsureNotBlizzard();
+        OwnerId = Guard.NotEmpty(newOwnerId, nameof(newOwnerId));
+        TroopCount = Guard.Positive(remainingTroops, nameof(remainingTroops));
     }
 
-    public void Deactivate() => Active = false;
-    
-    public Guid GameId { get; private set; }
-    public Game? Game { get; private set; }
+    /// <summary>Only <see cref="Game.Start"/> places blizzards, before anyone owns anything.</summary>
+    internal void MakeBlizzard()
+    {
+        if (OwnerId.HasValue)
+            throw new BusinessRuleException("An occupied territory cannot become a blizzard.");
+
+        IsBlizzard = true;
+    }
+
+    private void EnsureNotBlizzard()
+    {
+        if (IsBlizzard)
+            throw new BusinessRuleException("The territory is covered by a blizzard.");
+    }
 }

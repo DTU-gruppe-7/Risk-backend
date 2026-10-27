@@ -13,7 +13,6 @@
 **/*.p12
 **/*.key
 **/devcert.pem
-**/setup-dev-secrets.ps1
 
 # Build output og midlertidige filer
 **/bin/
@@ -42,3 +41,11 @@
 # OS metadata
 **/.DS_Store
 **/Thumbs.db
+
+# Ikke nødvendigt i imaget
+**/Risk.Tests/
+**/openapi.json
+**/Dockerfile*
+**/.dockerignore
+**/docker-compose*.yml
+**/*.md

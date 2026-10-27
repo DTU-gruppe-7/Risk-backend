@@ -1,3 +1,6 @@
+using Risk.Domain.Common;
+using Risk.Domain.Exceptions;
+
 namespace Risk.Domain.Entities;
 
 /// <summary>
@@ -32,24 +35,16 @@ public sealed class MissionCard
 
     public MissionCard(Guid gameId, string title, string description)
     {
-        if (gameId == Guid.Empty)
-            throw new ArgumentException("GameId must be a valid GUID.", nameof(gameId));
-        if (string.IsNullOrWhiteSpace(title))
-            throw new ArgumentException("Title must not be empty.", nameof(title));
-        if (string.IsNullOrWhiteSpace(description))
-            throw new ArgumentException("Description must not be empty.", nameof(description));
-
-        GameId = gameId;
-        Title = title.Trim();
-        Description = description.Trim();
+        GameId = Guard.NotEmpty(gameId, nameof(gameId));
+        Title = Guard.NotBlank(title, nameof(title));
+        Description = Guard.NotBlank(description, nameof(description));
     }
 
     public void AssignToPlayer(Guid playerId)
     {
-        if (playerId == Guid.Empty)
-            throw new ArgumentException("PlayerId must be a valid GUID.", nameof(playerId));
+        Guard.NotEmpty(playerId, nameof(playerId));
         if (PlayerId.HasValue)
-            throw new InvalidOperationException("Mission card is already assigned.");
+            throw new BusinessRuleException("Mission card is already assigned.");
 
         PlayerId = playerId;
     }
@@ -57,9 +52,9 @@ public sealed class MissionCard
     public void Complete()
     {
         if (!PlayerId.HasValue)
-            throw new InvalidOperationException("Cannot complete an unassigned mission.");
+            throw new BusinessRuleException("Cannot complete an unassigned mission.");
         if (IsCompleted)
-            throw new InvalidOperationException("Mission is already completed.");
+            throw new BusinessRuleException("Mission is already completed.");
 
         IsCompleted = true;
     }

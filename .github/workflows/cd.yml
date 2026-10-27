@@ -1,0 +1,254 @@
+name: CD
+
+on:
+  push:
+    branches: [develop, main]
+  # Nat-build af develop: samler Dependabot-opdateringer i ét deploy. Auto-mergede PR'er
+  # udløser ikke push-workflows (de merges med GITHUB_TOKEN), så de kommer også med her.
+  schedule:
+    - cron: '0 1 * * *'   # 03:00 dansk sommertid, 02:00 vintertid
+  # Manuelt deploy af develop, fx når en kritisk rettelse ikke skal vente til natten
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-${{ github.ref_name }}
+  cancel-in-progress: false   # afbryd aldrig en igangværende deploy
+
+env:
+  REGISTRY: ghcr.io/dtu-gruppe-7
+
+jobs:
+  # ---------------- develop: byg, signér og deploy til dev ----------------
+  # push:              byg, medmindre commit'en kommer fra en Dependabot-PR
+  # schedule:          byg kun, hvis det nuværende tree ikke allerede er bygget
+  # workflow_dispatch: byg altid
+  gate:
+    name: Skal der bygges?
+    if: github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: read
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+        if: github.event_name == 'schedule'
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: github.event_name == 'schedule'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Afgør
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          case "$EVENT" in
+            push)
+              # Commit→PR-koblingen oprettes asynkront efter et merge og kan
+              # mangle et øjeblik, så prøv igen før vi beslutter os
+              author=""
+              for i in 1 2 3 4 5; do
+                if author=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].user.login // ""' 2>/dev/null) \
+                   && [ -n "$author" ]; then
+                  break
+                fi
+                author=""
+                sleep $((i * 5))
+              done
+              if [ "$author" = "dependabot[bot]" ]; then
+                echo "::notice::Dependabot-opdatering: deployes i nat-buildet eller ved manuel kørsel af CD"
+                build=false
+              else
+                [ -z "$author" ] && echo "::warning::Kunne ikke slå PR op for $GITHUB_SHA; bygger for en sikkerheds skyld"
+                build=true
+              fi
+              ;;
+            schedule)
+              tree=""
+              for i in 1 2 3; do
+                tree=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.tree.sha 2>/dev/null) && [ -n "$tree" ] && break
+                tree=""
+                sleep 10
+              done
+              [ -z "$tree" ] && echo "::warning::Kunne ikke slå tree op for $GITHUB_SHA; bygger for en sikkerheds skyld"
+              if [ -n "$tree" ] && docker buildx imagetools inspect "$REGISTRY/risk-api:tree-$tree" >/dev/null 2>&1; then
+                echo "::notice::tree-$tree er allerede bygget, intet at deploye"
+                build=false
+              else
+                build=true
+              fi
+              ;;
+            *)
+              build=true
+              ;;
+          esac
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Byg, signér og push
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write       # push til GHCR
+      id-token: write       # keyless signering (OIDC)
+      attestations: write   # build provenance
+    outputs:
+      api: ${{ steps.api.outputs.digest }}
+      migrator: ${{ steps.migrator.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Find tree-hash
+        id: tree
+        run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Byg og push API
+        id: api
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          target: api
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/risk-api:tree-${{ steps.tree.outputs.hash }}
+            ${{ env.REGISTRY }}/risk-api:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Byg og push migrator
+        id: migrator
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          target: migrator
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/risk-migrator:tree-${{ steps.tree.outputs.hash }}
+            ${{ env.REGISTRY }}/risk-migrator:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=migrator
+          cache-to: type=gha,mode=max,scope=migrator
+
+      - name: Signér images (keyless)
+        env:
+          API: ${{ env.REGISTRY }}/risk-api@${{ steps.api.outputs.digest }}
+          MIGRATOR: ${{ env.REGISTRY }}/risk-migrator@${{ steps.migrator.outputs.digest }}
+        run: |
+          cosign sign --yes "$API"
+          cosign sign --yes "$MIGRATOR"
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/risk-api
+          subject-digest: ${{ steps.api.outputs.digest }}
+          push-to-registry: true
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/risk-migrator
+          subject-digest: ${{ steps.migrator.outputs.digest }}
+          push-to-registry: true
+
+  deploy-dev:
+    name: Deploy til dev
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: dev
+    steps:
+      - name: Deploy via SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          DIGESTS: ${{ needs.build.outputs.api }} ${{ needs.build.outputs.migrator }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "deploy@$HOST" "$DIGESTS"
+
+  # ---------------- main: promovér det testede image til prod ----------------
+  resolve-prod:
+    name: Find testet image
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      api: ${{ steps.digests.outputs.api }}
+      migrator: ${{ steps.digests.outputs.migrator }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Slå digests op via tree-hash
+        id: digests
+        run: |
+          TREE=$(git rev-parse 'HEAD^{tree}')
+          for img in api migrator; do
+            ref="$REGISTRY/risk-$img:tree-$TREE"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"') || true
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "::error::$ref findes ikke. Koden på main er ikke identisk med noget, der er bygget på develop. Send ændringen gennem develop."
+              exit 1
+            fi
+            echo "$img=$digest" >> "$GITHUB_OUTPUT"
+            echo "$img: $digest"
+          done
+
+  deploy-prod:
+    name: Deploy til prod
+    needs: resolve-prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: prod
+    steps:
+      - name: Deploy via SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          DIGESTS: ${{ needs.resolve-prod.outputs.api }} ${{ needs.resolve-prod.outputs.migrator }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "deploy@$HOST" "$DIGESTS"
