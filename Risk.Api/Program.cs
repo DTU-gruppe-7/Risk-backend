@@ -1,10 +1,8 @@
 using System.Reflection;
-using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Scalar.AspNetCore;
 using Risk.Api.Auth;
@@ -108,29 +106,15 @@ if (isDesignTime)
     if (string.IsNullOrWhiteSpace(jwt.Key))
         jwt.Key = "design-time-placeholder-bruges-aldrig-til-rigtige-tokens";
 }
-else if (!jwt.IsComplete)
+else
 {
-    throw new InvalidOperationException(
-        "Jwt:Key, Jwt:Issuer og Jwt:Audience skal være sat. Lokalt: opret .env ud fra .env.example, " +
-        "eller sæt Jwt__Key, Jwt__Issuer og Jwt__Audience i drift.");
+    // Fejl tidligt ved opstart i stedet for ved første login.
+    jwt.Validate();
 }
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwt.Issuer,
-            ValidateAudience = true,
-            ValidAudience = jwt.Audience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30)
-        };
-    });
+    .AddJwtBearer(options => options.TokenValidationParameters = jwt.CreateValidationParameters());
 
 builder.Services.AddAuthorization();
 

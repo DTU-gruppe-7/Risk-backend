@@ -10,7 +10,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Creates a new account and returns a JWT on success.",
+        "summary": "Creates a new account, returns an access token and sets the refresh cookie.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -33,7 +33,7 @@
         },
         "responses": {
           "200": {
-            "description": "Registration succeeded — JWT returned.",
+            "description": "Registration succeeded.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -80,7 +80,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Validates credentials and returns a fresh JWT.",
+        "summary": "Validates credentials, returns an access token and sets the refresh cookie.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -103,7 +103,7 @@
         },
         "responses": {
           "200": {
-            "description": "Login succeeded — JWT returned.",
+            "description": "Login succeeded.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -141,6 +141,69 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/Auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Exchanges the refresh cookie for a new access token. The refresh token is rotated:\nthe old one stops working and a new cookie is set.",
+        "responses": {
+          "200": {
+            "description": "A new access token.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid refresh cookie. The user must log in again.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Ends the login: revokes the refresh token and deletes the cookie. Always succeeds.",
+        "responses": {
+          "204": {
+            "description": "Logged out."
           }
         }
       }
@@ -1362,7 +1425,7 @@
         "tags": [
           "MissionCards"
         ],
-        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\r\nso other players' cards are never returned.",
+        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\nso other players' cards are never returned.",
         "parameters": [
           {
             "name": "gameId",
@@ -2312,7 +2375,7 @@
         "tags": [
           "Territories"
         ],
-        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\r\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
+        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
         "parameters": [
           {
             "name": "gameId",

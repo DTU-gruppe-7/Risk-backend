@@ -1,25 +1,20 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Risk.Application.Interfaces;
 using Risk.Domain.Entities;
 
 namespace Risk.Infrastructure.Identity;
 
-/// <summary>Creates signed JWTs for authenticated users.</summary>
-public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
+/// <summary>Creates short-lived signed access tokens (JWTs) for authenticated users.</summary>
+public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider clock) : IJwtTokenService
 {
     private readonly JwtOptions _options = options.Value;
 
     public string CreateToken(User user, IEnumerable<string> roles)
     {
-        if (!_options.IsComplete)
-            throw new InvalidOperationException("Jwt:Key, Jwt:Issuer and Jwt:Audience must be configured.");
-
-        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key));
-        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+        _options.Validate();
 
         var claims = new List<Claim>
         {
@@ -27,21 +22,24 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Name, user.Username),
-            // Unique token ID — useful for token revocation lists in the future
+            // Unique token ID, e.g. for logging or a deny list later
             new(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString()),
         };
-
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
-        var now = DateTime.UtcNow;
-        var token = new JwtSecurityToken(
-            issuer:   _options.Issuer,
-            audience: _options.Audience,
-            claims:   claims,
-            notBefore: now,
-            expires:  now.Add(_options.Lifetime),
-            signingCredentials: credentials);
+        var now = clock.GetUtcNow().UtcDateTime;
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = _options.Issuer,
+            Audience = _options.Audience,
+            Subject = new ClaimsIdentity(claims),
+            IssuedAt = now,
+            NotBefore = now,
+            Expires = now.Add(_options.AccessTokenLifetime),
+            SigningCredentials = new SigningCredentials(_options.SigningKey, SecurityAlgorithms.HmacSha256),
+        };
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        // JsonWebTokenHandler is the current, faster handler (JwtSecurityTokenHandler is legacy).
+        return new JsonWebTokenHandler().CreateToken(descriptor);
     }
 }
