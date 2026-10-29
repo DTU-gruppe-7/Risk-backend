@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Application.Interfaces.Services;
-using Risk.Application.Services;
 using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 using Risk.Infrastructure.Repositories;
@@ -52,8 +51,6 @@ public static class DependencyInjection
         services.AddScoped<IBonusCardRepository, BonusCardRepository>();
         services.AddScoped<IMissionCardRepository, MissionCardRepository>();
 
-        // Gameplay services
-        services.AddScoped<IGameplayService, GameplayService>();
         services.AddSingleton<IDiceRoller, DiceRoller>();
 
         return services;

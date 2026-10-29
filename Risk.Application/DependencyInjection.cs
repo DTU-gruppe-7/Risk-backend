@@ -1,6 +1,4 @@
 
-using Risk.Application.Interfaces.Services;
-using Risk.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Risk.Application.Interfaces.Services;
 using Risk.Application.Services;

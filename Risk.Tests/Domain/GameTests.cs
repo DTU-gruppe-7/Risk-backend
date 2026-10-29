@@ -64,6 +64,31 @@ public class GameTests
     }
 
     [Fact]
+    public void DeployTroops_rejects_deployment_outside_deployment_phase()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        game.SetPhase(GamePhase.Attack);
+        var territory = game.Territories.First(t => t.OwnerId == red.Id);
+
+        Assert.Throws<BusinessRuleException>(() => game.DeployTroops(red.Id, territory, 1));
+    }
+
+    [Fact]
+    public void DeployTroops_rejects_deployment_outside_current_players_turn()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        var territory = game.Territories.First(t => t.OwnerId == blue.Id);
+
+        Assert.Throws<BusinessRuleException>(() => game.DeployTroops(blue.Id, territory, 1));
+    }
+
+    [Fact]
     public void Start_places_the_configured_number_of_blizzards()
     {
         var game = new Game(Host);

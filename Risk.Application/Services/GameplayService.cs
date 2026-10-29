@@ -12,12 +12,14 @@ public class GameplayService(
     ITerritoryRepository territoryRepository,
     IMapRepository mapRepository,
     IUnitOfWork unitOfWork,
-    IDiceRoller diceRoller) : IGameplayService
+    IDiceRoller diceRoller,
+    ICurrentUser currentUser) : IGameplayService
 {
     public async Task<AttackResultDto> AttackAsync(AttackDto dto, CancellationToken cancellationToken = default)
     {
+        var playerId = currentUser.UserId;
         var (fromTerritory, toTerritory) = await ValidateAttackPrerequisitesAsync(
-            dto.GameId, dto.PlayerId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
+            dto.GameId, playerId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
 
         if (dto.AttackingTroopsCount < 1 || dto.AttackingTroopsCount > 3)
             throw new ArgumentOutOfRangeException(nameof(dto.AttackingTroopsCount), "Must attack with 1, 2, or 3 troops.");
@@ -44,7 +46,7 @@ public class GameplayService(
             // Rettet: - tegn tilføjet
             int movingTroops = dto.AttackingTroopsCount - battle.AttackerLosses;
             fromTerritory.RemoveTroops(movingTroops);
-            toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
+            toTerritory.TransferOwnership(playerId, movingTroops);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -60,8 +62,9 @@ public class GameplayService(
 
     public async Task<BlitzResultDto> BlitzAttackAsync(BlitzAttackDto dto, CancellationToken cancellationToken = default)
     {
+        var playerId = currentUser.UserId;
         var (fromTerritory, toTerritory) = await ValidateAttackPrerequisitesAsync(
-            dto.GameId, dto.PlayerId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
+            dto.GameId, playerId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
 
         if (fromTerritory.TroopCount <= 1)
             throw new InvalidOperationException("Originating territory must have at least 2 troops to initiate an attack.");
@@ -104,7 +107,7 @@ public class GameplayService(
             // Rettet: - tegn tilføjet
             int movingTroops = fromTerritory.TroopCount - 1;
             fromTerritory.RemoveTroops(movingTroops);
-            toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
+            toTerritory.TransferOwnership(playerId, movingTroops);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -129,6 +132,8 @@ public class GameplayService(
         var game = await gameRepository.GetByIdWithDetailsAsync(gameId, cancellationToken)
             ?? throw new KeyNotFoundException($"Game {gameId} not found.");
 
+        if (game.State != GameState.InProgress)
+            throw new InvalidOperationException("Attacks can only be initiated while the game is in progress.");
         if (game.CurrentPhase != GamePhase.Attack)
             throw new InvalidOperationException("Attacks can only be initiated during the Attack phase.");
 
@@ -146,10 +151,10 @@ public class GameplayService(
 
         if (toTerritory.OwnerId == playerId)
             throw new InvalidOperationException("Cannot attack your own territory.");
+        if (fromTerritory.GameId != game.Id || toTerritory.GameId != game.Id)
+            throw new InvalidOperationException("Both territories must belong to the game.");
 
         var graph = await mapRepository.GetGraphAsync(cancellationToken);
-        
-        // Brug Identifier eller Id streng afhængigt af din repository-implementering
         var neighbors = graph.NeighborsOf(fromTerritory.Identifier);
 
         if (!neighbors.Contains(toTerritory.Identifier))

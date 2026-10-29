@@ -215,6 +215,11 @@ public sealed class Game
     public void DeployTroops(Guid playerId, Territory territory, int troops)
     {
         EnsureState(GameState.InProgress, "Troops can only be deployed while the game is in progress.");
+        if (CurrentPhase != GamePhase.Deployment)
+            throw new BusinessRuleException("Troops can only be deployed during the Deployment phase.");
+        if (CurrentPlayerId != playerId)
+            throw new BusinessRuleException("It is not this player's turn.");
+
         var player = RequirePlayer(playerId);
         if (territory.GameId != Id)
             throw new BusinessRuleException("The territory is not part of this game.");
