@@ -110,9 +110,9 @@ public sealed class Game
     // Game flow
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Starts the game and lays out the board: one unoccupied territory per map territory,
-    /// with <see cref="GameSetting.BlizzardCount"/> of them turned into blizzards.
+   /// <summary>
+    /// Starts the game, lays out the board and distributes playable territories between
+    /// the players, with <see cref="GameSetting.BlizzardCount"/> of them turned into blizzards.
     /// </summary>
     /// <param name="map">The board.</param>
     /// <param name="random">Decides blizzard placement. Pass a seeded instance in tests.</param>
@@ -121,7 +121,11 @@ public sealed class Game
         EnsureState(GameState.Lobby, "Game can only be started from the Lobby state.");
         if (map.TerritoryIds.Count == 0)
             throw new DomainValidationException("The map has no territories.");
+        if (_players.Count is < GameSetting.MinPlayers or > GameSetting.DefaultMaxPlayers)
+            throw new BusinessRuleException(
+                $"A classic Risk game requires between {GameSetting.MinPlayers} and {GameSetting.DefaultMaxPlayers} players.");
 
+        // 1. Opret alle territorier på kortet og marker blizzards
         var blizzards = BlizzardPlacement.Choose(
             map, Settings?.BlizzardCount ?? 0, minPlayable: _players.Count, random);
 
@@ -133,6 +137,45 @@ public sealed class Game
             _territories.Add(territory);
         }
 
+        // 2. Udtræk de spilbare territorier (ikke-blizzards) og bland dem tilfældigt
+        var playableTerritories = _territories
+            .Where(territory => !territory.IsBlizzard)
+            .ToList();
+
+        for (var i = playableTerritories.Count - 1; i > 0; i--)
+        {
+            var swapIndex = random.Next(i + 1);
+            (playableTerritories[i], playableTerritories[swapIndex]) =
+                (playableTerritories[swapIndex], playableTerritories[i]);
+        }
+
+        // 3. Fordel territorierne skiftevis (Round-Robin) til spillerne
+        var players = _players.OrderBy(player => player.TurnOrder).ToList();
+        for (var i = 0; players.Count > 0 && i < playableTerritories.Count; i++)
+        {
+            playableTerritories[i].Claim(players[i % players.Count].Id);
+        }
+
+        // 4. Beregn resterende starttropper til hver spiller
+        var startingTroops = players.Count switch
+        {
+            2 => 40,
+            3 => 35,
+            4 => 30,
+            5 => 25,
+            6 => 20,
+            _ => throw new BusinessRuleException("Unsupported number of players for classic Risk."),
+        };
+
+        foreach (var player in players)
+        {
+            var claimedTerritoriesCount = playableTerritories.Count(t => t.OwnerId == player.Id);
+            player.AddReinforcements(startingTroops - claimedTerritoriesCount);
+        }
+
+        // 5. Sæt første spiller og skift tilstand
+        CurrentPlayerId = players.First().Id;
+        CurrentPhase = GamePhase.Deployment;
         State = GameState.InProgress;
         StartedAt = DateTimeOffset.UtcNow;
         BumpVersion();
@@ -166,6 +209,20 @@ public sealed class Game
     public void ReinforcePlayer(Guid playerId, int troops)
     {
         RequirePlayer(playerId).AddReinforcements(troops);
+        BumpVersion();
+    }
+
+    public void DeployTroops(Guid playerId, Territory territory, int troops)
+    {
+        EnsureState(GameState.InProgress, "Troops can only be deployed while the game is in progress.");
+        var player = RequirePlayer(playerId);
+        if (territory.GameId != Id)
+            throw new BusinessRuleException("The territory is not part of this game.");
+        if (territory.OwnerId != playerId)
+            throw new BusinessRuleException("You can only deploy troops to your own territories.");
+
+        player.PlaceTroops(troops);
+        territory.AddTroops(troops);
         BumpVersion();
     }
 

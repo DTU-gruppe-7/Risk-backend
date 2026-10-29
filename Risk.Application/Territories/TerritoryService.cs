@@ -10,7 +10,8 @@ namespace Risk.Application.Territories;
 public sealed class TerritoryService(
     ITerritoryRepository territories,
     IUnitOfWork unitOfWork,
-    GameAccess access)
+    GameAccess access,
+    ICurrentUser currentUser)
 {
     public async Task<IReadOnlyList<TerritoryResponse>> GetAllAsync(Guid gameId, Guid? ownerId, CancellationToken ct = default)
     {
@@ -34,6 +35,21 @@ public sealed class TerritoryService(
     {
         await access.RequireParticipantAsync(gameId, ct);
         return await ChangeAsync(gameId, id, t => t.AdjustTroops(request.Delta), ct);
+    }
+
+    public async Task<TerritoryResponse> DeployTroopsAsync(Guid gameId, Guid id, DeployTroopsRequest request,
+        CancellationToken ct = default)
+    {
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        var territory = game.Territories.FirstOrDefault(t => t.Id == id)
+                        ?? throw new NotFoundException("Territory", id);
+
+        var player = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId)
+                     ?? throw new ForbiddenException("Only a player can deploy troops.");
+        game.DeployTroops(player.Id, territory, request.Troops);
+
+        await unitOfWork.SaveChangesAsync(ct);
+        return TerritoryResponse.From(territory);
     }
 
     private async Task<TerritoryResponse> ChangeAsync(Guid gameId, Guid id, Action<Territory> change, CancellationToken ct)

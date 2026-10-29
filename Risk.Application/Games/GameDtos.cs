@@ -55,10 +55,10 @@ public sealed record GameSettingResponse(
 
 /// <summary>Lightweight player summary embedded in game responses.</summary>
 public sealed record PlayerSummaryResponse(
-    Guid Id, Guid UserId, string Color, int TurnOrder, bool IsEliminated)
+    Guid Id, Guid UserId, string Color, int TurnOrder, int ReinforcementTroops, bool IsEliminated)
 {
     internal static PlayerSummaryResponse From(Player p) =>
-        new(p.Id, p.UserId, p.Color, p.TurnOrder, p.IsEliminated);
+        new(p.Id, p.UserId, p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated);
 }
 
 /// <summary>Payload to create a new game. All fields are optional; defaults apply.</summary>

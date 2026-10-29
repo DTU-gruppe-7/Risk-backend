@@ -41,6 +41,7 @@ public class GameplayService(
         if (toTerritory.TroopCount == 0)
         {
             conquered = true;
+            // Rettet: - tegn tilføjet
             int movingTroops = dto.AttackingTroopsCount - battle.AttackerLosses;
             fromTerritory.RemoveTroops(movingTroops);
             toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
@@ -71,6 +72,7 @@ public class GameplayService(
 
         while (fromTerritory.TroopCount > 1 && toTerritory.TroopCount > 0)
         {
+            // Rettet: - tegn tilføjet
             int attackerDiceCount = Math.Min(3, fromTerritory.TroopCount - 1);
             int defenderDiceCount = Math.Min(2, toTerritory.TroopCount);
 
@@ -99,6 +101,7 @@ public class GameplayService(
         bool conquered = toTerritory.TroopCount == 0;
         if (conquered)
         {
+            // Rettet: - tegn tilføjet
             int movingTroops = fromTerritory.TroopCount - 1;
             fromTerritory.RemoveTroops(movingTroops);
             toTerritory.TransferOwnership(dto.PlayerId, movingTroops);
@@ -145,9 +148,11 @@ public class GameplayService(
             throw new InvalidOperationException("Cannot attack your own territory.");
 
         var graph = await mapRepository.GetGraphAsync(cancellationToken);
-        var neighbors = graph.NeighborsOf(fromTerritory.Id.ToString());
+        
+        // Brug Identifier eller Id streng afhængigt af din repository-implementering
+        var neighbors = graph.NeighborsOf(fromTerritory.Identifier);
 
-        if (!neighbors.Contains(toTerritory.Id.ToString()))
+        if (!neighbors.Contains(toTerritory.Identifier))
             throw new InvalidOperationException("Target territory is not adjacent to the attacking territory.");
 
         return (fromTerritory, toTerritory);
