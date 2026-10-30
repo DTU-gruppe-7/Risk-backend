@@ -1,4 +1,7 @@
+
 using Microsoft.Extensions.DependencyInjection;
+using Risk.Application.Interfaces.Services;
+using Risk.Application.Services;
 using Risk.Application.Auth;
 using Risk.Application.Cards;
 using Risk.Application.Common;
@@ -14,8 +17,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        services.AddScoped<GameAccess>();
 
+        services.AddScoped<IGameplayService, GameplayService>();
+        services.AddScoped<GameAccess>();
         services.AddScoped<AuthService>();
         services.AddScoped<UserService>();
         services.AddScoped<GameService>();
@@ -24,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<MapService>();
         services.AddScoped<BonusCardService>();
         services.AddScoped<MissionCardService>();
+
 
         return services;
     }
