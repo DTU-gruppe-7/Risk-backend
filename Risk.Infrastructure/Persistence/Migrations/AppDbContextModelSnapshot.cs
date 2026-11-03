@@ -203,6 +203,12 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("HostId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("PendingConquestFromTerritoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PendingConquestToTerritoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 

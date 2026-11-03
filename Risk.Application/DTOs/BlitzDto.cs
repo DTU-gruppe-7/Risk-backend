@@ -8,6 +8,8 @@ public record BlitzAttackDto(
     int? MovingTroopsCount = null
 );
 
+public record CompleteConquestDto(Guid GameId, Guid FromTerritoryId, Guid ToTerritoryId, int MovingTroopsCount);
+
 public record BlitzRoundDto(
     IReadOnlyList<int> AttackerDice,
     IReadOnlyList<int> DefenderDice,

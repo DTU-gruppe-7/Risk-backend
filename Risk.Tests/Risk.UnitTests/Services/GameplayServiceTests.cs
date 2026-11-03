@@ -14,6 +14,10 @@ public class GameplayService(
     IUnitOfWork unitOfWork,
     IDiceRoller diceRoller) : IGameplayService
 {
+    public Task CompleteConquestAsync(
+        CompleteConquestDto dto, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public async Task<AttackResultDto> AttackAsync(AttackDto dto, CancellationToken cancellationToken = default)
     {
         var (fromTerritory, toTerritory) = await ValidateAttackPrerequisitesAsync(

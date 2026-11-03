@@ -38,6 +38,10 @@ public sealed class GameAccess(IGameRepository games, ICurrentUser currentUser)
         return game;
     }
 
+    public Player RequireCurrentPlayer(Game game) =>
+        game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)
+        ?? throw new ForbiddenException("You are not a player in this game.");
+
     /// <summary>The game, if the current user is its host.</summary>
     public async Task<Game> RequireHostAsync(Guid gameId, CancellationToken ct = default)
     {

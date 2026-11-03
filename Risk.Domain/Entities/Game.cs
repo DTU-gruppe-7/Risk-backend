@@ -34,6 +34,8 @@ public sealed class Game
     public DateTimeOffset? TurnStartedAt { get; private set; }
     public DateTimeOffset? EndedAt { get; private set; }
     public bool HasConqueredTerritoryThisTurn { get; private set; }
+    public Guid? PendingConquestFromTerritoryId { get; private set; }
+    public Guid? PendingConquestToTerritoryId { get; private set; }
 
     // Navigation properties
     public GameSetting? Settings { get; private set; }
@@ -318,6 +320,33 @@ public sealed class Game
         from.RemoveTroops(troops);
         to.AddTroops(troops);
         AdvanceTurn(map, now);
+    }
+
+    public void BeginPendingConquest(Guid playerId, Territory from, Territory to)
+    {
+        EnsureState(GameState.InProgress, "A conquest can only happen while the game is in progress.");
+        if (CurrentPhase != GamePhase.Attack || CurrentPlayerId != playerId)
+            throw new BusinessRuleException("A conquest can only happen during the active player's Attack phase.");
+        PendingConquestFromTerritoryId = from.Id;
+        PendingConquestToTerritoryId = to.Id;
+        BumpVersion();
+    }
+
+    public void CompletePendingConquest(Guid playerId, Territory from, Territory to, int troops)
+    {
+        EnsureState(GameState.InProgress, "A conquest can only happen while the game is in progress.");
+        if (PendingConquestFromTerritoryId != from.Id || PendingConquestToTerritoryId != to.Id)
+            throw new BusinessRuleException("There is no pending conquest for these territories.");
+        if (CurrentPlayerId != playerId || CurrentPhase != GamePhase.Attack)
+            throw new BusinessRuleException("Only the active player can complete a conquest.");
+        if (troops <= 0 || troops >= from.TroopCount)
+            throw new BusinessRuleException("The origin territory must retain at least one troop.");
+
+        from.RemoveTroops(troops);
+        to.TransferOwnership(playerId, troops);
+        PendingConquestFromTerritoryId = null;
+        PendingConquestToTerritoryId = null;
+        BumpVersion();
     }
 
     public void DeployTroops(Guid playerId, Territory territory, int troops)
