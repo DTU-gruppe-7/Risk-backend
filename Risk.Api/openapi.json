@@ -870,7 +870,7 @@
         "tags": [
           "Games"
         ],
-        "summary": "Sets the current game phase (Deployment / Attack / Fortify).",
+        "summary": "Ends the current phase and advances to the next phase or player turn.",
         "parameters": [
           {
             "name": "id",
@@ -965,147 +965,6 @@
           },
           "409": {
             "description": "Game is not in progress.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/games/{id}/current-player": {
-      "put": {
-        "tags": [
-          "Games"
-        ],
-        "summary": "Sets which player's turn it currently is.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetCurrentPlayerRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetCurrentPlayerRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetCurrentPlayerRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Current player updated.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/GameDetailResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GameDetailResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GameDetailResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The player is not part of this game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Game not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Game is not in progress, or the player is eliminated.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3239,7 +3098,8 @@
           "players",
           "createdAt",
           "startedAt",
-          "endedAt"
+          "endedAt",
+          "turnStartedAt"
         ],
         "type": "object",
         "properties": {
@@ -3300,6 +3160,13 @@
             "format": "date-time"
           },
           "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "turnStartedAt": {
             "type": [
               "null",
               "string"
@@ -3731,18 +3598,6 @@
               "string"
             ],
             "format": "int32"
-          }
-        }
-      },
-      "SetCurrentPlayerRequest": {
-        "required": [
-          "playerId"
-        ],
-        "type": "object",
-        "properties": {
-          "playerId": {
-            "type": "string",
-            "format": "uuid"
           }
         }
       },

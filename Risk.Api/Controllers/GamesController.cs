@@ -67,7 +67,7 @@ public sealed class GamesController(GameService games) : ControllerBase
     public async Task<ActionResult<GameDetailResponse>> End(Guid id, CancellationToken ct)
         => Ok(await games.EndAsync(id, ct));
 
-    /// <summary>Sets the current game phase (Deployment / Attack / Fortify).</summary>
+    /// <summary>Ends the current phase and advances to the next phase or player turn.</summary>
     /// <response code="200">Phase updated.</response>
     /// <response code="403">Caller is not part of the game.</response>
     /// <response code="404">Game not found.</response>
@@ -78,22 +78,7 @@ public sealed class GamesController(GameService games) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<GameDetailResponse>> SetPhase(Guid id, [FromBody] SetPhaseRequest request, CancellationToken ct)
-        => Ok(await games.SetPhaseAsync(id, request, ct));
-
-    /// <summary>Sets which player's turn it currently is.</summary>
-    /// <response code="200">Current player updated.</response>
-    /// <response code="400">The player is not part of this game.</response>
-    /// <response code="403">Caller is not part of the game.</response>
-    /// <response code="404">Game not found.</response>
-    /// <response code="409">Game is not in progress, or the player is eliminated.</response>
-    [HttpPut("{id:guid}/current-player")]
-    [ProducesResponseType<GameDetailResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<GameDetailResponse>> SetCurrentPlayer(Guid id, [FromBody] SetCurrentPlayerRequest request, CancellationToken ct)
-        => Ok(await games.SetCurrentPlayerAsync(id, request, ct));
+        => Ok(await games.CompletePhaseAsync(id, request, ct));
 
     /// <summary>Returns the settings for a game.</summary>
     /// <response code="200">Settings returned.</response>

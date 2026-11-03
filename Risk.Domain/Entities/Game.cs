@@ -31,6 +31,7 @@ public sealed class Game
 
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? StartedAt { get; private set; }
+    public DateTimeOffset? TurnStartedAt { get; private set; }
     public DateTimeOffset? EndedAt { get; private set; }
 
     // Navigation properties
@@ -178,6 +179,7 @@ public sealed class Game
         CurrentPhase = GamePhase.Deployment;
         State = GameState.InProgress;
         StartedAt = DateTimeOffset.UtcNow;
+        TurnStartedAt = StartedAt;
         BumpVersion();
     }
 
@@ -194,6 +196,8 @@ public sealed class Game
         EnsureState(GameState.InProgress, "The current player can only be set while the game is in progress.");
         if (RequirePlayer(playerId).IsEliminated)
             throw new BusinessRuleException("An eliminated player cannot take a turn.");
+        if (CurrentPlayerId != playerId)
+            throw new BusinessRuleException("The active player can only be changed by ending the current turn.");
 
         CurrentPlayerId = playerId;
         BumpVersion();
@@ -202,7 +206,80 @@ public sealed class Game
     public void SetPhase(GamePhase phase)
     {
         EnsureState(GameState.InProgress, "The phase can only be changed while the game is in progress.");
+        if (phase != NextPhase())
+            throw new BusinessRuleException($"The next phase must be {NextPhase()}.");
+        if (phase == GamePhase.Deployment)
+        {
+            AdvanceTurn(DateTimeOffset.UtcNow);
+            return;
+        }
         CurrentPhase = phase;
+        BumpVersion();
+    }
+
+    public void EndPhase(Guid playerId, GamePhase expectedNextPhase, DateTimeOffset now)
+    {
+        EnsureState(GameState.InProgress, "A phase can only be ended while the game is in progress.");
+        if (CurrentPlayerId != playerId)
+            throw new BusinessRuleException("It is not this player's turn.");
+        if (expectedNextPhase != NextPhase())
+            throw new BusinessRuleException($"The next phase must be {NextPhase()}.");
+
+        if (expectedNextPhase == GamePhase.Attack)
+        {
+            CurrentPhase = GamePhase.Attack;
+        }
+        else if (expectedNextPhase == GamePhase.Fortify)
+        {
+            CurrentPhase = GamePhase.Fortify;
+        }
+        else
+        {
+            AdvanceTurn(now);
+            return;
+        }
+
+        BumpVersion();
+    }
+
+    public bool AdvanceIfTurnTimedOut(DateTimeOffset now)
+    {
+        EnsureState(GameState.InProgress, "A turn can only time out while the game is in progress.");
+        var limit = Settings?.TurnTimeLimit ?? 0;
+        if (limit == 0 || TurnStartedAt is null || TurnStartedAt.Value.AddSeconds(limit) > now)
+            return false;
+
+        AdvanceTurn(now);
+        return true;
+    }
+
+    private GamePhase NextPhase() => CurrentPhase switch
+    {
+        GamePhase.Deployment => GamePhase.Attack,
+        GamePhase.Attack => GamePhase.Fortify,
+        GamePhase.Fortify => GamePhase.Deployment,
+        _ => throw new BusinessRuleException("The game has an invalid phase.")
+    };
+
+    private void AdvanceTurn(DateTimeOffset now)
+    {
+        var activePlayers = _players
+            .Where(player => !player.IsEliminated)
+            .OrderBy(player => player.TurnOrder)
+            .ToList();
+        if (activePlayers.Count == 0)
+            throw new BusinessRuleException("There are no active players left.");
+
+        var current = CurrentPlayerId is null
+            ? null
+            : activePlayers.FirstOrDefault(player => player.Id == CurrentPlayerId);
+        var next = current is null
+            ? activePlayers[0]
+            : activePlayers.FirstOrDefault(player => player.TurnOrder > current.TurnOrder) ?? activePlayers[0];
+
+        CurrentPlayerId = next.Id;
+        CurrentPhase = GamePhase.Deployment;
+        TurnStartedAt = now;
         BumpVersion();
     }
 

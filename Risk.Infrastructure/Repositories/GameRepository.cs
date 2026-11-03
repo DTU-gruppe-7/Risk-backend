@@ -47,4 +47,11 @@ public class GameRepository(AppDbContext context) : Repository<Game>(context), I
 
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default) =>
         _dbSet.AnyAsync(g => g.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<Game>> GetInProgressGamesAsync(CancellationToken cancellationToken = default) =>
+        await _dbSet
+            .Include(g => g.Settings)
+            .Include(g => g.Players)
+            .Where(g => g.State == GameState.InProgress && g.Settings != null && g.Settings.TurnTimeLimit > 0)
+            .ToListAsync(cancellationToken);
 }

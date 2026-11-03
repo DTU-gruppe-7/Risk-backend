@@ -48,6 +48,9 @@ internal sealed class FakeGameRepository : IGameRepository
     public Task<IReadOnlyList<Game>> GetGamesByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Game>>(Games.Where(g => g.HasParticipant(userId)).ToList());
 
+    public Task<IReadOnlyList<Game>> GetInProgressGamesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Game>>(Games.Where(g => g.State == GameState.InProgress).ToList());
+
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Games.Any(g => g.Id == id));
 

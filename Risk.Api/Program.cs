@@ -16,6 +16,7 @@ using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+var isDesignTime = Assembly.GetEntryAssembly() != Assembly.GetExecutingAssembly();
 
 // I drift mountes secrets som filer i /run/secrets (Docker Compose secrets).
 // Filnavnet er nøglen: "Jwt__Key" bliver til Jwt:Key. Mappen findes ikke lokalt, så den er valgfri.
@@ -65,7 +66,7 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddOpenApi();
-builder.Services.AddApplication();
+builder.Services.AddApplication(!isDesignTime);
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddHttpContextAccessor();
@@ -98,8 +99,6 @@ builder.Services.AddHealthChecks()
 
 // Både "dotnet build" (OpenAPI-generering), "dotnet ef" og migration bundles bygger
 // host'en uden at starte den. Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
-var isDesignTime = Assembly.GetEntryAssembly() != Assembly.GetExecutingAssembly();
-
 // Samme JwtOptions som JwtTokenService bruger, så udstedelse og validering aldrig kan glide fra hinanden.
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 

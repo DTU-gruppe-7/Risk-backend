@@ -29,18 +29,20 @@ public sealed record GameSummaryResponse(
 /// <param name="CreatedAt">When the game was created.</param>
 /// <param name="StartedAt">When the game started (null if not yet started).</param>
 /// <param name="EndedAt">When the game ended (null if not finished).</param>
+/// <param name="TurnStartedAt">When the current player's turn started.</param>
 public sealed record GameDetailResponse(
     Guid Id, long Version, Guid HostId, GameState State,
     Guid? CurrentPlayerId, GamePhase CurrentPhase,
     GameSettingResponse? Settings,
     IEnumerable<PlayerSummaryResponse> Players,
-    DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt)
+    DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt,
+    DateTimeOffset? TurnStartedAt)
 {
     internal static GameDetailResponse From(Game g) =>
         new(g.Id, g.Version, g.HostId, g.State, g.CurrentPlayerId, g.CurrentPhase,
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
             g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
-            g.CreatedAt, g.StartedAt, g.EndedAt);
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
 }
 
 /// <summary>Game configuration snapshot.</summary>

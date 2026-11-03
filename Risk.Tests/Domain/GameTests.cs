@@ -89,6 +89,54 @@ public class GameTests
     }
 
     [Fact]
+    public void Ending_each_phase_advances_to_the_next_player()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        var now = DateTimeOffset.UtcNow;
+
+        game.EndPhase(red.Id, GamePhase.Attack, now);
+        Assert.Equal(GamePhase.Attack, game.CurrentPhase);
+        game.EndPhase(red.Id, GamePhase.Fortify, now);
+        Assert.Equal(GamePhase.Fortify, game.CurrentPhase);
+        game.EndPhase(red.Id, GamePhase.Deployment, now);
+
+        Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
+        Assert.NotEqual(red.Id, game.CurrentPlayerId);
+        Assert.Equal(now, game.TurnStartedAt);
+    }
+
+    [Fact]
+    public void A_timed_out_turn_advances_to_the_next_player()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.ConfigureSettings(6, 0, 10, false, false);
+        game.Start(Map, new Random(1));
+        var turnStarted = game.TurnStartedAt!.Value;
+
+        Assert.True(game.AdvanceIfTurnTimedOut(turnStarted.AddSeconds(10)));
+        Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
+        Assert.NotEqual(red.Id, game.CurrentPlayerId);
+        Assert.False(game.AdvanceIfTurnTimedOut(turnStarted.AddSeconds(10)));
+    }
+
+    [Fact]
+    public void A_phase_can_only_be_ended_by_the_active_player_in_order()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+
+        Assert.Throws<BusinessRuleException>(() => game.EndPhase(blue.Id, GamePhase.Attack, DateTimeOffset.UtcNow));
+        Assert.Throws<BusinessRuleException>(() => game.EndPhase(red.Id, GamePhase.Fortify, DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
     public void Start_places_the_configured_number_of_blizzards()
     {
         var game = new Game(Host);

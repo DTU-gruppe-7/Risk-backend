@@ -15,7 +15,7 @@ namespace Risk.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services)
+    public static IServiceCollection AddApplication(this IServiceCollection services, bool includeBackgroundServices = true)
     {
 
         services.AddScoped<IGameplayService, GameplayService>();
@@ -28,6 +28,8 @@ public static class DependencyInjection
         services.AddScoped<MapService>();
         services.AddScoped<BonusCardService>();
         services.AddScoped<MissionCardService>();
+        if (includeBackgroundServices)
+            services.AddHostedService<TurnTimeoutWorker>();
 
 
         return services;

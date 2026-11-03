@@ -65,6 +65,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
             entity.Property(g => g.State).HasConversion<string>().HasMaxLength(30).IsRequired();
             entity.Property(g => g.CurrentPhase).HasConversion<string>().HasMaxLength(30).IsRequired();
+            entity.Property(g => g.TurnStartedAt);
 
             // Explicit FK from HostId → User
             entity.HasOne<User>()
