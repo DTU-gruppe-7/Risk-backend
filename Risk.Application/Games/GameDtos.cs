@@ -83,7 +83,3 @@ public sealed record UpdateGameSettingRequest(
 /// <summary>Payload to change the current game phase.</summary>
 /// <param name="Phase">New phase.</param>
 public sealed record SetPhaseRequest(GamePhase Phase);
-
-/// <summary>Payload to set the active player.</summary>
-/// <param name="PlayerId">ID of the player whose turn it now is.</param>
-public sealed record SetCurrentPlayerRequest(Guid PlayerId);

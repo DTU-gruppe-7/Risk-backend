@@ -191,37 +191,13 @@ public sealed class Game
         BumpVersion();
     }
 
-    public void SetCurrentPlayer(Guid playerId)
-    {
-        EnsureState(GameState.InProgress, "The current player can only be set while the game is in progress.");
-        if (RequirePlayer(playerId).IsEliminated)
-            throw new BusinessRuleException("An eliminated player cannot take a turn.");
-        if (CurrentPlayerId != playerId)
-            throw new BusinessRuleException("The active player can only be changed by ending the current turn.");
-
-        CurrentPlayerId = playerId;
-        BumpVersion();
-    }
-
-    public void SetPhase(GamePhase phase)
-    {
-        EnsureState(GameState.InProgress, "The phase can only be changed while the game is in progress.");
-        if (phase != NextPhase())
-            throw new BusinessRuleException($"The next phase must be {NextPhase()}.");
-        if (phase == GamePhase.Deployment)
-        {
-            AdvanceTurn(DateTimeOffset.UtcNow);
-            return;
-        }
-        CurrentPhase = phase;
-        BumpVersion();
-    }
-
     public void EndPhase(Guid playerId, GamePhase expectedNextPhase, DateTimeOffset now)
     {
         EnsureState(GameState.InProgress, "A phase can only be ended while the game is in progress.");
         if (CurrentPlayerId != playerId)
             throw new BusinessRuleException("It is not this player's turn.");
+        if (RequirePlayer(playerId).IsEliminated)
+            throw new BusinessRuleException("An eliminated player cannot end a phase.");
         if (expectedNextPhase != NextPhase())
             throw new BusinessRuleException($"The next phase must be {NextPhase()}.");
 

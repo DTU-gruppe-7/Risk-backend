@@ -83,7 +83,7 @@ public class GameAndPlayerServiceTests
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             _playerService.ReinforceAsync(game.Id, player.Id, new ReinforceRequest(3)));
         await Assert.ThrowsAsync<ForbiddenException>(() =>
-            _gameService.SetPhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Attack)));
+            _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Attack)));
     }
 
     [Fact]
@@ -102,17 +102,4 @@ public class GameAndPlayerServiceTests
         Assert.Empty(_games.Games.Single().Players);
     }
 
-    [Fact]
-    public async Task SetCurrentPlayer_rejects_a_player_from_another_game()
-    {
-        var game = await CreateGameAsync();
-        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
-        _currentUser.UserId = Guid.NewGuid();
-        await _playerService.JoinAsync(game.Id, new JoinGameRequest("blue"));
-        _currentUser.UserId = _host;
-        await _gameService.StartAsync(game.Id);
-
-        await Assert.ThrowsAsync<ValidationFailedException>(() =>
-            _gameService.SetCurrentPlayerAsync(game.Id, new SetCurrentPlayerRequest(Guid.NewGuid())));
-    }
 }

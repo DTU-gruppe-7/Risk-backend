@@ -51,22 +51,12 @@ public sealed class GameService(
     public Task<GameDetailResponse> EndAsync(Guid id, CancellationToken ct = default) =>
         AsHostAsync(id, game => game.End(), ct);
 
-    public Task<GameDetailResponse> SetPhaseAsync(Guid id, SetPhaseRequest request, CancellationToken ct = default) =>
-        CompletePhaseAsync(id, request, ct);
-
     public Task<GameDetailResponse> CompletePhaseAsync(Guid id, SetPhaseRequest request, CancellationToken ct = default) =>
         AsParticipantAsync(id, game =>
         {
             var player = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId)
                          ?? throw new ForbiddenException("Only a player can end a phase.");
             game.EndPhase(player.Id, request.Phase, DateTimeOffset.UtcNow);
-        }, ct);
-
-    public Task<GameDetailResponse> SetCurrentPlayerAsync(Guid id, SetCurrentPlayerRequest request, CancellationToken ct = default) =>
-        AsParticipantAsync(id, game =>
-        {
-            GameAccess.RequirePlayerInGame(game, request.PlayerId);
-            game.SetCurrentPlayer(request.PlayerId);
         }, ct);
 
     public async Task<GameSettingResponse> GetSettingsAsync(Guid id, CancellationToken ct = default)
