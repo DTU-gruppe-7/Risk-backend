@@ -80,6 +80,17 @@ public sealed class GamesController(GameService games) : ControllerBase
     public async Task<ActionResult<GameDetailResponse>> SetPhase(Guid id, [FromBody] SetPhaseRequest request, CancellationToken ct)
         => Ok(await games.CompletePhaseAsync(id, request, ct));
 
+    /// <summary>Moves troops along a connected path during Fortify and ends the turn.</summary>
+    /// <response code="200">Troops moved and the next player's Deployment phase started.</response>
+    /// <response code="404">Game or territory not found.</response>
+    /// <response code="409">Fortification is not allowed in the current game state.</response>
+    [HttpPut("{id:guid}/fortify")]
+    [ProducesResponseType<GameDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<GameDetailResponse>> Fortify(Guid id, [FromBody] FortifyRequest request, CancellationToken ct)
+        => Ok(await games.FortifyAsync(id, request, ct));
+
     /// <summary>Returns the settings for a game.</summary>
     /// <response code="200">Settings returned.</response>
     /// <response code="404">Game or settings not found.</response>

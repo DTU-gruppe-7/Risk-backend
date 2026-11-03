@@ -83,3 +83,6 @@ public sealed record UpdateGameSettingRequest(
 /// <summary>Payload to change the current game phase.</summary>
 /// <param name="Phase">New phase.</param>
 public sealed record SetPhaseRequest(GamePhase Phase);
+
+/// <summary>Payload to move troops during the current player's Fortify phase.</summary>
+public sealed record FortifyRequest(Guid FromTerritoryId, Guid ToTerritoryId, int Troops);

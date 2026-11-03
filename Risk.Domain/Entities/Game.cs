@@ -295,6 +295,31 @@ public sealed class Game
         return true;
     }
 
+    public void Fortify(Guid playerId, Territory from, Territory to, int troops, MapGraph map, DateTimeOffset now)
+    {
+        EnsureState(GameState.InProgress, "Fortification can only happen while the game is in progress.");
+        if (CurrentPhase != GamePhase.Fortify)
+            throw new BusinessRuleException("Fortification can only happen during the Fortify phase.");
+        if (CurrentPlayerId != playerId)
+            throw new BusinessRuleException("It is not this player's turn.");
+        if (RequirePlayer(playerId).IsEliminated)
+            throw new BusinessRuleException("An eliminated player cannot fortify.");
+        if (from.GameId != Id || to.GameId != Id)
+            throw new BusinessRuleException("Both territories must belong to this game.");
+        if (troops <= 0)
+            throw new BusinessRuleException("At least one troop must be moved.");
+
+        var board = BoardOn(map);
+        if (!board.CanFortify(from.Identifier, to.Identifier, playerId))
+            throw new BusinessRuleException("The selected territories cannot be fortified.");
+        if (troops >= from.TroopCount)
+            throw new BusinessRuleException("The originating territory must retain at least one troop.");
+
+        from.RemoveTroops(troops);
+        to.AddTroops(troops);
+        AdvanceTurn(map, now);
+    }
+
     public void DeployTroops(Guid playerId, Territory territory, int troops)
     {
         EnsureState(GameState.InProgress, "Troops can only be deployed while the game is in progress.");

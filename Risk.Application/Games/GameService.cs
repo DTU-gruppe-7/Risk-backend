@@ -63,6 +63,22 @@ public sealed class GameService(
         return GameDetailResponse.From(game);
     }
 
+    public async Task<GameDetailResponse> FortifyAsync(Guid id, FortifyRequest request, CancellationToken ct = default)
+    {
+        var game = await access.RequireParticipantWithDetailsAsync(id, ct);
+        var graph = await map.GetGraphAsync(ct);
+        var player = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId)
+                     ?? throw new ForbiddenException("Only a player can fortify.");
+        var from = game.Territories.FirstOrDefault(t => t.Id == request.FromTerritoryId)
+                   ?? throw new NotFoundException("Origin territory", request.FromTerritoryId);
+        var to = game.Territories.FirstOrDefault(t => t.Id == request.ToTerritoryId)
+                 ?? throw new NotFoundException("Destination territory", request.ToTerritoryId);
+
+        game.Fortify(player.Id, from, to, request.Troops, graph, DateTimeOffset.UtcNow);
+        await unitOfWork.SaveChangesAsync(ct);
+        return GameDetailResponse.From(game);
+    }
+
     public async Task<GameSettingResponse> GetSettingsAsync(Guid id, CancellationToken ct = default)
     {
         var game = await access.RequireGameAsync(id, ct);

@@ -104,6 +104,55 @@ public class GameTests
     }
 
     [Fact]
+    public void Fortify_moves_troops_and_starts_the_next_players_deployment_phase()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+
+        game.DeployTroops(red.Id, game.Territories.First(t => t.OwnerId == red.Id), red.ReinforcementTroops);
+        game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
+
+        var source = game.Territories
+            .Where(t => t.OwnerId == red.Id)
+            .First(t => Map.NeighborsOf(t.Identifier)
+                .Select(id => game.Territories.FirstOrDefault(target => target.Identifier == id))
+                .Any(target => target?.OwnerId == red.Id));
+        var destination = Map.NeighborsOf(source.Identifier)
+            .Select(id => game.Territories.First(target => target.Identifier == id))
+            .First(t => t.OwnerId == red.Id);
+        source.AddTroops(2);
+        var sourceBefore = source.TroopCount;
+        var destinationBefore = destination.TroopCount;
+
+        game.Fortify(red.Id, source, destination, 2, Map, DateTimeOffset.UtcNow);
+
+        Assert.Equal(sourceBefore - 2, source.TroopCount);
+        Assert.Equal(destinationBefore + 2, destination.TroopCount);
+        Assert.Equal(blue.Id, game.CurrentPlayerId);
+        Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
+    }
+
+    [Fact]
+    public void Fortify_rejects_moving_all_troops_from_origin()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+
+        game.DeployTroops(red.Id, game.Territories.First(t => t.OwnerId == red.Id), red.ReinforcementTroops);
+        game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
+
+        var source = game.Territories.First(t => t.OwnerId == red.Id);
+        var destination = game.Territories.First(t => t.OwnerId == red.Id && t.Id != source.Id);
+
+        Assert.Throws<BusinessRuleException>(() =>
+            game.Fortify(red.Id, source, destination, source.TroopCount, Map, DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
     public void Ending_each_phase_advances_to_the_next_player()
     {
         var game = new Game(Host);
