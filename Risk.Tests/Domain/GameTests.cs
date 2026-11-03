@@ -64,6 +64,21 @@ public class GameTests
     }
 
     [Fact]
+    public void Deploying_the_last_reinforcement_automatically_starts_attack_phase()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        var territory = game.Territories.First(t => t.OwnerId == red.Id);
+
+        game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
+
+        Assert.Equal(GamePhase.Attack, game.CurrentPhase);
+        Assert.Equal(0, red.ReinforcementTroops);
+    }
+
+    [Fact]
     public void DeployTroops_rejects_deployment_outside_deployment_phase()
     {
         var game = new Game(Host);
@@ -72,7 +87,6 @@ public class GameTests
         game.Start(Map, new Random(1));
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
-        game.EndPhase(red.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow);
 
         Assert.Throws<BusinessRuleException>(() => game.DeployTroops(red.Id, territory, 1));
     }
@@ -100,7 +114,6 @@ public class GameTests
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
 
-        game.EndPhase(red.Id, GamePhase.Attack, Map, now);
         Assert.Equal(GamePhase.Attack, game.CurrentPhase);
         game.EndPhase(red.Id, GamePhase.Fortify, Map, now);
         Assert.Equal(GamePhase.Fortify, game.CurrentPhase);
@@ -121,7 +134,6 @@ public class GameTests
 
         var redTerritory = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, redTerritory, red.ReinforcementTroops);
-        game.EndPhase(red.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow);
         game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
         game.EndPhase(red.Id, GamePhase.Deployment, Map, DateTimeOffset.UtcNow);
 
@@ -325,7 +337,6 @@ public class GameTests
         game.Start(Map, new Random(1));
         var territory = game.Territories.First(t => t.OwnerId == player.Id);
         game.DeployTroops(player.Id, territory, player.ReinforcementTroops);
-        game.EndPhase(player.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow);
 
         Assert.Equal(GamePhase.Attack, game.CurrentPhase);
         Assert.Equal(player.Id, game.CurrentPlayerId);

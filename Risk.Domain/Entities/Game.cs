@@ -286,6 +286,8 @@ public sealed class Game
 
         player.PlaceTroops(troops);
         territory.AddTroops(troops);
+        if (player.ReinforcementTroops == 0)
+            CurrentPhase = GamePhase.Attack;
         BumpVersion();
     }
 
