@@ -191,7 +191,7 @@ public sealed class Game
         BumpVersion();
     }
 
-    public void EndPhase(Guid playerId, GamePhase expectedNextPhase, DateTimeOffset now)
+    public void EndPhase(Guid playerId, GamePhase expectedNextPhase, MapGraph map, DateTimeOffset now)
     {
         EnsureState(GameState.InProgress, "A phase can only be ended while the game is in progress.");
         if (CurrentPlayerId != playerId)
@@ -200,6 +200,8 @@ public sealed class Game
             throw new BusinessRuleException("An eliminated player cannot end a phase.");
         if (expectedNextPhase != NextPhase())
             throw new BusinessRuleException($"The next phase must be {NextPhase()}.");
+        if (expectedNextPhase == GamePhase.Attack && RequirePlayer(playerId).ReinforcementTroops > 0)
+            throw new BusinessRuleException("All reinforcement troops must be deployed before attacking.");
 
         if (expectedNextPhase == GamePhase.Attack)
         {
@@ -211,21 +213,21 @@ public sealed class Game
         }
         else
         {
-            AdvanceTurn(now);
+            AdvanceTurn(map, now);
             return;
         }
 
         BumpVersion();
     }
 
-    public bool AdvanceIfTurnTimedOut(DateTimeOffset now)
+    public bool AdvanceIfTurnTimedOut(MapGraph map, DateTimeOffset now)
     {
         EnsureState(GameState.InProgress, "A turn can only time out while the game is in progress.");
         var limit = Settings?.TurnTimeLimit ?? 0;
         if (limit == 0 || TurnStartedAt is null || TurnStartedAt.Value.AddSeconds(limit) > now)
             return false;
 
-        AdvanceTurn(now);
+        AdvanceTurn(map, now);
         return true;
     }
 
@@ -237,7 +239,7 @@ public sealed class Game
         _ => throw new BusinessRuleException("The game has an invalid phase.")
     };
 
-    private void AdvanceTurn(DateTimeOffset now)
+    private void AdvanceTurn(MapGraph map, DateTimeOffset now)
     {
         var activePlayers = _players
             .Where(player => !player.IsEliminated)
@@ -253,16 +255,19 @@ public sealed class Game
             ? activePlayers[0]
             : activePlayers.FirstOrDefault(player => player.TurnOrder > current.TurnOrder) ?? activePlayers[0];
 
+        next.AddReinforcements(CalculateReinforcements(next.Id, map));
         CurrentPlayerId = next.Id;
         CurrentPhase = GamePhase.Deployment;
         TurnStartedAt = now;
         BumpVersion();
     }
 
-    public void ReinforcePlayer(Guid playerId, int troops)
+    private int CalculateReinforcements(Guid playerId, MapGraph map)
     {
-        RequirePlayer(playerId).AddReinforcements(troops);
-        BumpVersion();
+        var ownedTerritories = _territories.Count(t => t.OwnerId == playerId);
+        var territoryReinforcements = Math.Max(3, ownedTerritories / 3);
+        var continentBonus = BoardOn(map).ContinentBonusFor(playerId);
+        return territoryReinforcements + continentBonus;
     }
 
     public void DeployTroops(Guid playerId, Territory territory, int troops)

@@ -23,7 +23,3 @@ public sealed record PlayerDetailResponse(
 /// <summary>Payload to join a game.</summary>
 /// <param name="Color">Requested board colour (e.g. "red", "blue").</param>
 public sealed record JoinGameRequest(string Color);
-
-/// <summary>Payload to add reinforcement troops to a player.</summary>
-/// <param name="Troops">Number of troops to add (must be positive).</param>
-public sealed record ReinforceRequest(int Troops);

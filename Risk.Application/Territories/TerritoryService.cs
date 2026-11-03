@@ -23,20 +23,6 @@ public sealed class TerritoryService(
     public async Task<TerritoryResponse> GetByIdAsync(Guid gameId, Guid id, CancellationToken ct = default) =>
         TerritoryResponse.From(await RequireTerritoryAsync(gameId, id, ct));
 
-    public async Task<TerritoryResponse> ClaimAsync(Guid gameId, Guid id, ClaimTerritoryRequest request, CancellationToken ct = default)
-    {
-        var game = await access.RequireParticipantAsync(gameId, ct);
-        GameAccess.RequirePlayerInGame(game, request.PlayerId);
-
-        return await ChangeAsync(gameId, id, t => t.Claim(request.PlayerId, request.InitialTroops), ct);
-    }
-
-    public async Task<TerritoryResponse> UpdateTroopsAsync(Guid gameId, Guid id, UpdateTroopsRequest request, CancellationToken ct = default)
-    {
-        await access.RequireParticipantAsync(gameId, ct);
-        return await ChangeAsync(gameId, id, t => t.AdjustTroops(request.Delta), ct);
-    }
-
     public async Task<TerritoryResponse> DeployTroopsAsync(Guid gameId, Guid id, DeployTroopsRequest request,
         CancellationToken ct = default)
     {
@@ -48,14 +34,6 @@ public sealed class TerritoryService(
                      ?? throw new ForbiddenException("Only a player can deploy troops.");
         game.DeployTroops(player.Id, territory, request.Troops);
 
-        await unitOfWork.SaveChangesAsync(ct);
-        return TerritoryResponse.From(territory);
-    }
-
-    private async Task<TerritoryResponse> ChangeAsync(Guid gameId, Guid id, Action<Territory> change, CancellationToken ct)
-    {
-        var territory = await RequireTerritoryAsync(gameId, id, ct);
-        change(territory);
         await unitOfWork.SaveChangesAsync(ct);
         return TerritoryResponse.From(territory);
     }

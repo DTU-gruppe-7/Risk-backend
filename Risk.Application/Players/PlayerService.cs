@@ -54,9 +54,6 @@ public sealed class PlayerService(
     public Task<PlayerDetailResponse> EliminateAsync(Guid gameId, Guid id, CancellationToken ct = default) =>
         ChangeAsync(gameId, id, game => game.EliminatePlayer(id), ct);
 
-    public Task<PlayerDetailResponse> ReinforceAsync(Guid gameId, Guid id, ReinforceRequest request, CancellationToken ct = default) =>
-        ChangeAsync(gameId, id, game => game.ReinforcePlayer(id, request.Troops), ct);
-
     private async Task<PlayerDetailResponse> ChangeAsync(Guid gameId, Guid id, Action<Game> change, CancellationToken ct)
     {
         var game = await access.RequireParticipantAsync(gameId, ct);

@@ -37,13 +37,15 @@ public sealed class TurnTimeoutWorker(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var games = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+        var map = scope.ServiceProvider.GetRequiredService<IMapRepository>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var now = DateTimeOffset.UtcNow;
         var changed = false;
+        var graph = await map.GetGraphAsync(cancellationToken);
 
         foreach (var game in await games.GetInProgressGamesAsync(cancellationToken))
         {
-            changed |= game.AdvanceIfTurnTimedOut(now);
+            changed |= game.AdvanceIfTurnTimedOut(graph, now);
         }
 
         if (changed)

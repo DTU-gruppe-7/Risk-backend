@@ -40,7 +40,7 @@ public class GameAndPlayerServiceTests
     public async Task Only_the_host_can_start_the_game()
     {
         var game = await CreateGameAsync();
-        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
+        var player = await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
         _currentUser.UserId = Guid.NewGuid();
         await _playerService.JoinAsync(game.Id, new JoinGameRequest("blue"));
 
@@ -76,12 +76,10 @@ public class GameAndPlayerServiceTests
     {
         var game = await CreateGameAsync();
         _currentUser.UserId = Guid.NewGuid();
-        var player = await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
+        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
 
         _currentUser.UserId = Guid.NewGuid();
 
-        await Assert.ThrowsAsync<ForbiddenException>(() =>
-            _playerService.ReinforceAsync(game.Id, player.Id, new ReinforceRequest(3)));
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Attack)));
     }

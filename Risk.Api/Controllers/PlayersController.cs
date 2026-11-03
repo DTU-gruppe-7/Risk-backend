@@ -71,16 +71,4 @@ public sealed class PlayersController(PlayerService players) : ControllerBase
     public async Task<ActionResult<PlayerDetailResponse>> Eliminate(Guid gameId, Guid id, CancellationToken ct)
         => Ok(await players.EliminateAsync(gameId, id, ct));
 
-    /// <summary>Adds reinforcement troops to a player's pool.</summary>
-    /// <response code="200">Troops added.</response>
-    /// <response code="400">Troops must be positive.</response>
-    /// <response code="403">Caller is not part of the game.</response>
-    /// <response code="404">Player not found.</response>
-    [HttpPut("{id:guid}/reinforce")]
-    [ProducesResponseType<PlayerDetailResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<PlayerDetailResponse>> Reinforce(Guid gameId, Guid id, [FromBody] ReinforceRequest request, CancellationToken ct)
-        => Ok(await players.ReinforceAsync(gameId, id, request, ct));
 }

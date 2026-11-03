@@ -70,8 +70,9 @@ public class GameTests
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
         game.Start(Map, new Random(1));
-        game.EndPhase(red.Id, GamePhase.Attack, DateTimeOffset.UtcNow);
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
+        game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
+        game.EndPhase(red.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow);
 
         Assert.Throws<BusinessRuleException>(() => game.DeployTroops(red.Id, territory, 1));
     }
@@ -96,16 +97,47 @@ public class GameTests
         game.AddPlayer(Guid.NewGuid(), "blue");
         game.Start(Map, new Random(1));
         var now = DateTimeOffset.UtcNow;
+        var territory = game.Territories.First(t => t.OwnerId == red.Id);
+        game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
 
-        game.EndPhase(red.Id, GamePhase.Attack, now);
+        game.EndPhase(red.Id, GamePhase.Attack, Map, now);
         Assert.Equal(GamePhase.Attack, game.CurrentPhase);
-        game.EndPhase(red.Id, GamePhase.Fortify, now);
+        game.EndPhase(red.Id, GamePhase.Fortify, Map, now);
         Assert.Equal(GamePhase.Fortify, game.CurrentPhase);
-        game.EndPhase(red.Id, GamePhase.Deployment, now);
+        game.EndPhase(red.Id, GamePhase.Deployment, Map, now);
 
         Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
         Assert.NotEqual(red.Id, game.CurrentPlayerId);
         Assert.Equal(now, game.TurnStartedAt);
+    }
+
+    [Fact]
+    public void Starting_a_new_turn_adds_territory_based_reinforcements()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+
+        var redTerritory = game.Territories.First(t => t.OwnerId == red.Id);
+        game.DeployTroops(red.Id, redTerritory, red.ReinforcementTroops);
+        game.EndPhase(red.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow);
+        game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
+        game.EndPhase(red.Id, GamePhase.Deployment, Map, DateTimeOffset.UtcNow);
+
+        Assert.Equal(26, blue.ReinforcementTroops);
+    }
+
+    [Fact]
+    public void Deployment_cannot_end_while_reinforcements_remain()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+
+        Assert.Throws<BusinessRuleException>(() =>
+            game.EndPhase(red.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow));
     }
 
     [Fact]
@@ -118,10 +150,10 @@ public class GameTests
         game.Start(Map, new Random(1));
         var turnStarted = game.TurnStartedAt!.Value;
 
-        Assert.True(game.AdvanceIfTurnTimedOut(turnStarted.AddSeconds(10)));
+        Assert.True(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10)));
         Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
         Assert.NotEqual(red.Id, game.CurrentPlayerId);
-        Assert.False(game.AdvanceIfTurnTimedOut(turnStarted.AddSeconds(10)));
+        Assert.False(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10)));
     }
 
     [Fact]
@@ -132,8 +164,8 @@ public class GameTests
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         game.Start(Map, new Random(1));
 
-        Assert.Throws<BusinessRuleException>(() => game.EndPhase(blue.Id, GamePhase.Attack, DateTimeOffset.UtcNow));
-        Assert.Throws<BusinessRuleException>(() => game.EndPhase(red.Id, GamePhase.Fortify, DateTimeOffset.UtcNow));
+        Assert.Throws<BusinessRuleException>(() => game.EndPhase(blue.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow));
+        Assert.Throws<BusinessRuleException>(() => game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow));
     }
 
     [Fact]
@@ -288,10 +320,12 @@ public class GameTests
         game.AddPlayer(Guid.NewGuid(), "blue");
 
         Assert.Throws<BusinessRuleException>(() =>
-            game.EndPhase(player.Id, GamePhase.Fortify, DateTimeOffset.UtcNow));
+            game.EndPhase(player.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow));
 
         game.Start(Map, new Random(1));
-        game.EndPhase(player.Id, GamePhase.Attack, DateTimeOffset.UtcNow);
+        var territory = game.Territories.First(t => t.OwnerId == player.Id);
+        game.DeployTroops(player.Id, territory, player.ReinforcementTroops);
+        game.EndPhase(player.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow);
 
         Assert.Equal(GamePhase.Attack, game.CurrentPhase);
         Assert.Equal(player.Id, game.CurrentPlayerId);
@@ -307,7 +341,7 @@ public class GameTests
         game.EliminatePlayer(player.Id);
 
         Assert.Throws<BusinessRuleException>(() =>
-            game.EndPhase(player.Id, GamePhase.Attack, DateTimeOffset.UtcNow));
+            game.EndPhase(player.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow));
     }
 
     [Fact]
@@ -318,10 +352,9 @@ public class GameTests
 
         var player = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.ReinforcePlayer(player.Id, 3);
         game.Start(Map, new Random(1));
 
-        Assert.Equal(before + 4, game.Version);
+        Assert.Equal(before + 3, game.Version);
     }
 
     [Fact]
