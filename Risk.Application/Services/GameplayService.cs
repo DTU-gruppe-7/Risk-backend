@@ -11,6 +11,7 @@ public class GameplayService(
     IGameRepository gameRepository,
     ITerritoryRepository territoryRepository,
     IMapRepository mapRepository,
+    IBonusCardRepository bonusCards,
     IUnitOfWork unitOfWork,
     IDiceRoller diceRoller,
     ICurrentUser currentUser) : IGameplayService
@@ -21,13 +22,17 @@ public class GameplayService(
         var (fromTerritory, toTerritory) = await ValidateAttackPrerequisitesAsync(
             dto.GameId, playerId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
 
-        if (dto.AttackingTroopsCount < 1 || dto.AttackingTroopsCount > 3)
+        if (dto.AttackingTroopsCount is < 1 or > 3)
             throw new ArgumentOutOfRangeException(nameof(dto.AttackingTroopsCount), "Must attack with 1, 2, or 3 troops.");
 
-        if (fromTerritory.TroopCount <= dto.AttackingTroopsCount)
+        if (dto.AttackingTroopsCount >= fromTerritory.TroopCount)
             throw new InvalidOperationException("Originating territory must retain at least 1 troop.");
 
-        int defenderDiceCount = Math.Min(2, toTerritory.TroopCount);
+        if (dto.DefendingTroopsCount is < 1 or > 2 || dto.DefendingTroopsCount > toTerritory.TroopCount)
+            throw new ArgumentOutOfRangeException(nameof(dto.DefendingTroopsCount),
+                "The defender must choose 1 or 2 troops, up to the number stationed in the territory.");
+
+        int defenderDiceCount = dto.DefendingTroopsCount;
         var attackerDice = diceRoller.Roll(dto.AttackingTroopsCount);
         var defenderDice = diceRoller.Roll(defenderDiceCount);
 
@@ -40,13 +45,22 @@ public class GameplayService(
             toTerritory.RemoveTroops(battle.DefenderLosses);
 
         bool conquered = false;
+        var troopsMoved = 0;
+        var bonusCardAwarded = false;
         if (toTerritory.TroopCount == 0)
         {
             conquered = true;
-            // Rettet: - tegn tilføjet
-            int movingTroops = dto.AttackingTroopsCount - battle.AttackerLosses;
-            fromTerritory.RemoveTroops(movingTroops);
-            toTerritory.TransferOwnership(playerId, movingTroops);
+            var minimumTroopsToMove = dto.AttackingTroopsCount;
+            if (dto.MovingTroopsCount is null ||
+                dto.MovingTroopsCount < minimumTroopsToMove ||
+                dto.MovingTroopsCount > fromTerritory.TroopCount - 1)
+                throw new ArgumentOutOfRangeException(nameof(dto.MovingTroopsCount),
+                    $"Conquest requires moving between {minimumTroopsToMove} and {fromTerritory.TroopCount - 1} troops.");
+
+            troopsMoved = dto.MovingTroopsCount.Value;
+            fromTerritory.RemoveTroops(troopsMoved);
+            toTerritory.TransferOwnership(playerId, troopsMoved);
+            bonusCardAwarded = await AwardConquestCardAsync(dto.GameId, playerId, cancellationToken);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -56,7 +70,9 @@ public class GameplayService(
             DefenderLosses: battle.DefenderLosses,
             AttackerDice: battle.SortedAttackerDice,
             DefenderDice: battle.SortedDefenderDice,
-            TerritoryConquered: conquered
+            TerritoryConquered: conquered,
+            TroopsMoved: troopsMoved,
+            BonusCardAwarded: bonusCardAwarded
         );
     }
 
@@ -102,12 +118,20 @@ public class GameplayService(
         }
 
         bool conquered = toTerritory.TroopCount == 0;
+        var troopsMoved = 0;
+        var bonusCardAwarded = false;
         if (conquered)
         {
-            // Rettet: - tegn tilføjet
-            int movingTroops = fromTerritory.TroopCount - 1;
-            fromTerritory.RemoveTroops(movingTroops);
-            toTerritory.TransferOwnership(playerId, movingTroops);
+            if (dto.MovingTroopsCount is null ||
+                dto.MovingTroopsCount < 1 ||
+                dto.MovingTroopsCount > fromTerritory.TroopCount - 1)
+                throw new ArgumentOutOfRangeException(nameof(dto.MovingTroopsCount),
+                    $"Conquest requires moving between 1 and {fromTerritory.TroopCount - 1} troops.");
+
+            troopsMoved = dto.MovingTroopsCount.Value;
+            fromTerritory.RemoveTroops(troopsMoved);
+            toTerritory.TransferOwnership(playerId, troopsMoved);
+            bonusCardAwarded = await AwardConquestCardAsync(dto.GameId, playerId, cancellationToken);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -118,7 +142,9 @@ public class GameplayService(
             TerritoryConquered: conquered,
             RemainingAttackingTerritoryTroops: fromTerritory.TroopCount,
             RemainingDefendingTerritoryTroops: toTerritory.TroopCount,
-            Rounds: rounds
+            Rounds: rounds,
+            TroopsMoved: troopsMoved,
+            BonusCardAwarded: bonusCardAwarded
         );
     }
 
@@ -155,11 +181,27 @@ public class GameplayService(
             throw new InvalidOperationException("Both territories must belong to the game.");
 
         var graph = await mapRepository.GetGraphAsync(cancellationToken);
-        var neighbors = graph.NeighborsOf(fromTerritory.Identifier);
-
-        if (!neighbors.Contains(toTerritory.Identifier))
-            throw new InvalidOperationException("Target territory is not adjacent to the attacking territory.");
+        var board = game.BoardOn(graph);
+        if (!board.CanAttack(fromTerritory.Identifier, toTerritory.Identifier, playerId))
+            throw new InvalidOperationException("The attack is not allowed from the selected territories.");
 
         return (fromTerritory, toTerritory);
+    }
+
+    private async Task<bool> AwardConquestCardAsync(Guid gameId, Guid playerId, CancellationToken cancellationToken)
+    {
+        var game = await gameRepository.GetByIdWithDetailsAsync(gameId, cancellationToken)
+                   ?? throw new KeyNotFoundException($"Game {gameId} not found.");
+        if (!game.RecordConquest(playerId))
+            return false;
+
+        var card = await bonusCards.GetNextUnassignedAsync(gameId, cancellationToken);
+        if (card is null)
+            return false;
+
+        var player = game.FindPlayer(playerId)
+                     ?? throw new InvalidOperationException("Attacking player is not part of the game.");
+        card.AssignToPlayer(player.Id);
+        return true;
     }
 }

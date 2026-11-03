@@ -33,6 +33,7 @@ public sealed class Game
     public DateTimeOffset? StartedAt { get; private set; }
     public DateTimeOffset? TurnStartedAt { get; private set; }
     public DateTimeOffset? EndedAt { get; private set; }
+    public bool HasConqueredTerritoryThisTurn { get; private set; }
 
     // Navigation properties
     public GameSetting? Settings { get; private set; }
@@ -116,7 +117,7 @@ public sealed class Game
     /// the players, with <see cref="GameSetting.BlizzardCount"/> of them turned into blizzards.
     /// </summary>
     /// <param name="map">The board.</param>
-    /// <param name="random">Decides blizzard placement. Pass a seeded instance in tests.</param>
+    /// <param name="random">Decides blizzard placement, territory ownership and initial troop placement.</param>
     public void Start(MapGraph map, Random random)
     {
         EnsureState(GameState.Lobby, "Game can only be started from the Lobby state.");
@@ -157,7 +158,7 @@ public sealed class Game
             playableTerritories[i].Claim(players[i % players.Count].Id);
         }
 
-        // 4. Beregn resterende starttropper til hver spiller
+        // 4. Fordel de resterende klassiske starttropper tilfældigt på spillerens territorier.
         var startingTroops = players.Count switch
         {
             2 => 40,
@@ -170,12 +171,22 @@ public sealed class Game
 
         foreach (var player in players)
         {
-            var claimedTerritoriesCount = playableTerritories.Count(t => t.OwnerId == player.Id);
-            player.AddReinforcements(startingTroops - claimedTerritoriesCount);
+            var ownedTerritories = playableTerritories
+                .Where(t => t.OwnerId == player.Id)
+                .ToList();
+            var remainingTroops = startingTroops - ownedTerritories.Count;
+
+            for (var troop = 0; troop < remainingTroops; troop++)
+            {
+                var territory = ownedTerritories[random.Next(ownedTerritories.Count)];
+                territory.AddTroops(1);
+            }
         }
 
-        // 5. Sæt første spiller og skift tilstand
-        CurrentPlayerId = players.First().Id;
+        // 5. Start første spillers normale tur med reinforcement deployment.
+        var firstPlayer = players.First();
+        firstPlayer.AddReinforcements(CalculateReinforcements(firstPlayer.Id, map));
+        CurrentPlayerId = firstPlayer.Id;
         CurrentPhase = GamePhase.Deployment;
         State = GameState.InProgress;
         StartedAt = DateTimeOffset.UtcNow;
@@ -256,6 +267,7 @@ public sealed class Game
             : activePlayers.FirstOrDefault(player => player.TurnOrder > current.TurnOrder) ?? activePlayers[0];
 
         next.AddReinforcements(CalculateReinforcements(next.Id, map));
+        HasConqueredTerritoryThisTurn = false;
         CurrentPlayerId = next.Id;
         CurrentPhase = GamePhase.Deployment;
         TurnStartedAt = now;
@@ -268,6 +280,19 @@ public sealed class Game
         var territoryReinforcements = Math.Max(3, ownedTerritories / 3);
         var continentBonus = BoardOn(map).ContinentBonusFor(playerId);
         return territoryReinforcements + continentBonus;
+    }
+
+    public bool RecordConquest(Guid playerId)
+    {
+        EnsureState(GameState.InProgress, "A territory can only be conquered while the game is in progress.");
+        if (CurrentPhase != GamePhase.Attack || CurrentPlayerId != playerId)
+            throw new BusinessRuleException("A territory can only be conquered during the active player's Attack phase.");
+        if (HasConqueredTerritoryThisTurn)
+            return false;
+
+        HasConqueredTerritoryThisTurn = true;
+        BumpVersion();
+        return true;
     }
 
     public void DeployTroops(Guid playerId, Territory territory, int troops)

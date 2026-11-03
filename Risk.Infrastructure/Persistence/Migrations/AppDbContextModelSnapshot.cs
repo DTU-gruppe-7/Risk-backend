@@ -197,6 +197,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("EndedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("HasConqueredTerritoryThisTurn")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("HostId")
                         .HasColumnType("uuid");
 

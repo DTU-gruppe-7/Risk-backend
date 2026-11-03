@@ -10,6 +10,12 @@ public class BonusCardRepository(AppDbContext context) : Repository<BonusCard>(c
     public Task<BonusCard?> GetAsync(Guid gameId, Guid cardId, CancellationToken cancellationToken = default) =>
         _dbSet.FirstOrDefaultAsync(b => b.Id == cardId && b.GameId == gameId, cancellationToken);
 
+    public Task<BonusCard?> GetNextUnassignedAsync(Guid gameId, CancellationToken cancellationToken = default) =>
+        _dbSet
+            .Where(b => b.GameId == gameId && b.PlayerId == null && !b.Used)
+            .OrderBy(b => b.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<BonusCard>> GetByGameIdAsync(Guid gameId, Guid? playerId = null,
         CancellationToken cancellationToken = default)
     {

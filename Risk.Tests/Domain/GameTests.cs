@@ -27,7 +27,7 @@ public class GameTests
         });
         Assert.Equal(21, game.Territories.Count(t => t.OwnerId == red.Id));
         Assert.Equal(21, game.Territories.Count(t => t.OwnerId == blue.Id));
-        Assert.Equal(19, red.ReinforcementTroops);
+        Assert.Equal(22, red.ReinforcementTroops);
         Assert.Equal(19, blue.ReinforcementTroops);
     }
 
@@ -59,7 +59,7 @@ public class GameTests
 
         game.DeployTroops(red.Id, territory, 3);
 
-        Assert.Equal(16, red.ReinforcementTroops);
+        Assert.Equal(19, red.ReinforcementTroops);
         Assert.Equal(4, territory.TroopCount);
     }
 
