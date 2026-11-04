@@ -3,6 +3,7 @@ using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Domain.Entities;
+using Risk.Domain.Map;
 
 namespace Risk.Application.Games;
 
@@ -11,6 +12,7 @@ public sealed class GameService(
     IGameRepository games,
     IMapRepository map,
     IBonusCardRepository bonusCards,
+    IMissionCardRepository missionCards,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     GameAccess access)
@@ -34,7 +36,8 @@ public sealed class GameService(
             turnTimeLimit: request.TurnTimeLimit ?? 0,
             hasFogOfWar:   request.HasFogOfWar ?? false,
             hasMissions:   request.HasMissions ?? false,
-            blizzardCount: request.BlizzardCount ?? 0);
+            blizzardCount: request.BlizzardCount ?? 0,
+            victoryMode:   request.VictoryMode);
 
         games.Add(game);
         await unitOfWork.SaveChangesAsync(ct);
@@ -60,6 +63,9 @@ public sealed class GameService(
             bonusCards.Add(new BonusCard(id, BonusCardType.Wild));
             bonusCards.Add(new BonusCard(id, BonusCardType.Wild));
         }
+
+        if (game.Settings?.HasMissions == true)
+            await CreateAndAssignMissionsAsync(game, mapTerritories, ct);
 
         await unitOfWork.SaveChangesAsync(ct);
         return GameDetailResponse.From(game);
@@ -107,7 +113,7 @@ public sealed class GameService(
     {
         var game = await access.RequireHostAsync(id, ct);
         game.ConfigureSettings(request.MaxPlayers, request.Timer, request.TurnTimeLimit,
-            request.HasFogOfWar, request.HasMissions, request.BlizzardCount);
+            request.HasFogOfWar, request.HasMissions, request.BlizzardCount, request.VictoryMode);
 
         await unitOfWork.SaveChangesAsync(ct);
         return GameSettingResponse.From(game.Settings!);
@@ -133,4 +139,33 @@ public sealed class GameService(
             1 => BonusCardType.Cavalry,
             _ => BonusCardType.Artillery
         };
+
+    private async Task CreateAndAssignMissionsAsync(
+        Game game, IReadOnlyList<MapTerritory> mapTerritories, CancellationToken ct)
+    {
+        var existingMissions = await missionCards.GetByGameIdAsync(game.Id, null, ct);
+        if (existingMissions.Count > 0)
+            return;
+
+        var continents = mapTerritories
+            .Select(territory => territory.ContinentId)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToList();
+        var players = game.Players.OrderBy(player => player.TurnOrder).ToList();
+
+        for (var index = 0; index < players.Count; index++)
+        {
+            var player = players[index];
+            var continent = continents[index % continents.Count];
+            var mission = new MissionCard(
+                game.Id,
+                $"Control {continent}",
+                $"Control every territory in {continent}.",
+                MissionObjectiveType.ControlContinent,
+                continent);
+            mission.AssignToPlayer(player.Id);
+            missionCards.Add(mission);
+        }
+    }
 }

@@ -3389,6 +3389,16 @@
               "string"
             ],
             "format": "int32"
+          },
+          "victoryMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GameVictoryMode"
+              }
+            ]
           }
         }
       },
@@ -3543,6 +3553,7 @@
           "turnTimeLimit",
           "hasFogOfWar",
           "hasMissions",
+          "victoryMode",
           "blizzardCount"
         ],
         "type": "object",
@@ -3584,6 +3595,9 @@
           },
           "hasMissions": {
             "type": "boolean"
+          },
+          "victoryMode": {
+            "$ref": "#/components/schemas/GameVictoryMode"
           },
           "blizzardCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -3641,6 +3655,9 @@
             "format": "date-time"
           }
         }
+      },
+      "GameVictoryMode": {
+        "type": "integer"
       },
       "JoinGameRequest": {
         "required": [
@@ -4090,6 +4107,16 @@
             ],
             "format": "int32",
             "default": 0
+          },
+          "victoryMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GameVictoryMode"
+              }
+            ]
           }
         }
       },

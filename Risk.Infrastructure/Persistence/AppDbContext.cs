@@ -107,6 +107,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("game_settings");
             entity.HasKey(s => s.Id);
+            entity.Property(s => s.VictoryMode)
+                  .HasConversion<string>()
+                  .HasMaxLength(30)
+                  .IsRequired();
         });
 
         // ------------------------------------------------------------------

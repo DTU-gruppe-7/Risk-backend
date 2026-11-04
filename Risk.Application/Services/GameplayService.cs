@@ -247,7 +247,7 @@ public sealed class GameplayService(
     private async Task EvaluateVictoryAsync(
         Game game, Guid playerId, CancellationToken cancellationToken)
     {
-        if (game.ControlsAllTerritories(playerId))
+        if (game.Settings?.HasMissions != true && game.ControlsAllTerritories(playerId))
         {
             game.FinishWithWinner(playerId);
             return;

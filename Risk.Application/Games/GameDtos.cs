@@ -50,10 +50,12 @@ public sealed record GameDetailResponse(
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
 public sealed record GameSettingResponse(
     Guid Id, Guid GameId, int MaxPlayers, int Timer,
-    int TurnTimeLimit, bool HasFogOfWar, bool HasMissions, int BlizzardCount)
+    int TurnTimeLimit, bool HasFogOfWar, bool HasMissions, GameVictoryMode VictoryMode,
+    int BlizzardCount)
 {
     internal static GameSettingResponse From(GameSetting s) =>
-        new(s.Id, s.GameId, s.MaxPlayers, s.Timer, s.TurnTimeLimit, s.HasFogOfWar, s.HasMissions, s.BlizzardCount);
+        new(s.Id, s.GameId, s.MaxPlayers, s.Timer, s.TurnTimeLimit, s.HasFogOfWar,
+            s.HasMissions, s.VictoryMode, s.BlizzardCount);
 }
 
 /// <summary>Lightweight player summary embedded in game responses.</summary>
@@ -73,13 +75,15 @@ public sealed record PlayerSummaryResponse(
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. Default: 0 (off).</param>
 public sealed record CreateGameRequest(
     int? MaxPlayers, int? Timer, int? TurnTimeLimit,
-    bool? HasFogOfWar, bool? HasMissions, int? BlizzardCount = null);
+    bool? HasFogOfWar, bool? HasMissions, int? BlizzardCount = null,
+    GameVictoryMode? VictoryMode = null);
 
 /// <summary>Payload to fully replace game settings.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
 public sealed record UpdateGameSettingRequest(
     int MaxPlayers, int Timer, int TurnTimeLimit,
-    bool HasFogOfWar, bool HasMissions, int BlizzardCount = 0);
+    bool HasFogOfWar, bool HasMissions, int BlizzardCount = 0,
+    GameVictoryMode? VictoryMode = null);
 
 /// <summary>Payload to change the current game phase.</summary>
 /// <param name="Phase">New phase.</param>

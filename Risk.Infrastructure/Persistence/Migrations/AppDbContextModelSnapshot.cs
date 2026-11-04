@@ -253,9 +253,6 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<bool>("HasFogOfWar")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("HasMissions")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("MaxPlayers")
                         .HasColumnType("integer");
 
@@ -264,6 +261,11 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("TurnTimeLimit")
                         .HasColumnType("integer");
+
+                    b.Property<string>("VictoryMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
 

@@ -23,6 +23,7 @@ public class GameAndPlayerServiceTests
             _games,
             new FakeMapRepository(),
             new FakeBonusCardRepository(),
+            new FakeMissionCardRepository(),
             _unitOfWork,
             _currentUser,
             access);

@@ -76,16 +76,18 @@ public sealed class Game
     // -------------------------------------------------------------------------
 
     public void ConfigureSettings(int maxPlayers, int timer, int turnTimeLimit, bool hasFogOfWar, bool hasMissions,
-        int blizzardCount = 0)
+        int blizzardCount = 0, GameVictoryMode? victoryMode = null)
     {
         EnsureState(GameState.Lobby, "Settings can only be changed while the game is in the Lobby.");
         if (maxPlayers < _players.Count)
             throw new BusinessRuleException("MaxPlayers cannot be lower than the number of players already in the game.");
 
         if (Settings is null)
-            Settings = new GameSetting(Id, maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount);
+            Settings = new GameSetting(Id, maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions,
+                blizzardCount, victoryMode);
         else
-            Settings.Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount);
+            Settings.Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions,
+                blizzardCount, victoryMode);
 
         BumpVersion();
     }
