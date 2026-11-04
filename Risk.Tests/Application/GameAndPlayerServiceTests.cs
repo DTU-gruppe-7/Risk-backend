@@ -18,8 +18,14 @@ public class GameAndPlayerServiceTests
     public GameAndPlayerServiceTests()
     {
         _currentUser = new FakeCurrentUser(_host);
-        var access = new GameAccess(_games, _currentUser);
-        _gameService = new GameService(_games, new FakeMapRepository(), _unitOfWork, _currentUser, access);
+        var access = new GameAccess(_games, _currentUser, new FakeBonusCardRepository());
+        _gameService = new GameService(
+            _games,
+            new FakeMapRepository(),
+            new FakeBonusCardRepository(),
+            _unitOfWork,
+            _currentUser,
+            access);
         _playerService = new PlayerService(
             new FakePlayerRepository(_games),
             new FakeBonusCardRepository(),

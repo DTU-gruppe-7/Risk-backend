@@ -3,6 +3,7 @@ using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Domain.Entities;
+using Risk.Domain.Exceptions;
 
 namespace Risk.Application.Cards;
 
@@ -22,14 +23,28 @@ public sealed class BonusCardService(
     public async Task<BonusCardResponse> AssignAsync(Guid gameId, Guid id, AssignCardRequest request, CancellationToken ct = default)
     {
         var game = await access.RequireParticipantAsync(gameId, ct);
+        EnsureInProgress(game);
         GameAccess.RequirePlayerInGame(game, request.PlayerId);
         return await ChangeAsync(gameId, id, card => card.AssignToPlayer(request.PlayerId), ct);
     }
 
-    public async Task<BonusCardResponse> UseAsync(Guid gameId, Guid id, CancellationToken ct = default)
+    public async Task<TradeCardsResponse> TradeAsync(
+        Guid gameId, TradeCardsRequest request, CancellationToken ct = default)
     {
-        await access.RequireParticipantAsync(gameId, ct);
-        return await ChangeAsync(gameId, id, card => card.MarkAsUsed(), ct);
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        var player = access.RequireCurrentPlayer(game);
+        if (request.CardIds is null || request.CardIds.Count != 3 ||
+            request.CardIds.Distinct().Count() != 3)
+            throw new DomainValidationException("Exactly three different cards must be traded.");
+
+        var hand = await cards.GetByPlayerIdAsync(gameId, player.Id, ct);
+        var selected = hand.Where(card => request.CardIds.Contains(card.Id)).ToList();
+        if (selected.Count != 3)
+            throw new ForbiddenException("All selected cards must belong to your hand.");
+
+        var troops = game.TradeBonusCards(player.Id, selected);
+        await unitOfWork.SaveChangesAsync(ct);
+        return new TradeCardsResponse(troops);
     }
 
     private async Task<BonusCardResponse> ChangeAsync(Guid gameId, Guid id, Action<BonusCard> change, CancellationToken ct)
@@ -38,5 +53,11 @@ public sealed class BonusCardService(
         change(card);
         await unitOfWork.SaveChangesAsync(ct);
         return BonusCardResponse.From(card);
+    }
+
+    private static void EnsureInProgress(Game game)
+    {
+        if (game.State != GameState.InProgress)
+            throw new BusinessRuleException("Bonus cards can only be changed while the game is in progress.");
     }
 }

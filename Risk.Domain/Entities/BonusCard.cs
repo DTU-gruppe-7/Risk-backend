@@ -60,6 +60,9 @@ public sealed class BonusCard
         PlayerId = null;
     }
 
+    public bool Matches(BonusCard other) =>
+        Type == other.Type && Type != BonusCardType.Wild;
+
     public void ReturnToDeck()
     {
         if (Used)

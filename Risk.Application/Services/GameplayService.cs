@@ -66,6 +66,7 @@ public sealed class GameplayService(
                 context.Game, defeatedPlayerId, context.PlayerId, cancellationToken);
             bonusCardAwarded = await AwardConquestCardAsync(
                 context.Game, context.PlayerId, cancellationToken);
+            await EvaluateVictoryAsync(context.Game, context.PlayerId, cancellationToken);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -133,6 +134,7 @@ public sealed class GameplayService(
                 troopsMoved = dto.MovingTroopsCount.Value;
                 bonusCardAwarded = await AwardConquestCardAsync(
                     context.Game, context.PlayerId, cancellationToken);
+                await EvaluateVictoryAsync(context.Game, context.PlayerId, cancellationToken);
             }
         }
 
@@ -164,6 +166,7 @@ public sealed class GameplayService(
         CompletePendingConquest(game, playerId, from, to, dto.MovingTroopsCount);
         await HandleEliminationAsync(game, defeatedPlayerId, playerId, cancellationToken);
         await AwardConquestCardAsync(game, playerId, cancellationToken);
+        await EvaluateVictoryAsync(game, playerId, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
@@ -184,6 +187,7 @@ public sealed class GameplayService(
                 "Attacks can only be initiated during the Attack phase.");
 
         var player = access.RequireCurrentPlayer(game);
+        await access.EnsureForcedCardTradeCompletedAsync(game, player.Id, cancellationToken);
         if (game.CurrentPlayerId != player.Id)
             throw new BusinessRuleException("It is not this player's turn.");
 
@@ -238,6 +242,31 @@ public sealed class GameplayService(
         var mission = await missionCards.GetByPlayerIdAsync(
             game.Id, defeatedPlayerId, cancellationToken);
         mission?.ReleaseFromPlayer();
+    }
+
+    private async Task EvaluateVictoryAsync(
+        Game game, Guid playerId, CancellationToken cancellationToken)
+    {
+        if (game.ControlsAllTerritories(playerId))
+        {
+            game.FinishWithWinner(playerId);
+            return;
+        }
+
+        if (game.Settings?.HasMissions != true)
+            return;
+
+        var mission = await missionCards.GetByPlayerIdAsync(
+            game.Id, playerId, cancellationToken);
+        if (mission is null || mission.IsCompleted)
+            return;
+
+        var map = await mapRepository.GetGraphAsync(cancellationToken);
+        if (!mission.IsSatisfiedBy(game, map, playerId))
+            return;
+
+        mission.Complete(game, map);
+        game.FinishWithWinner(playerId);
     }
 
     private static void ApplyBattleLosses(

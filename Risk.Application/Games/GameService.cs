@@ -10,6 +10,7 @@ namespace Risk.Application.Games;
 public sealed class GameService(
     IGameRepository games,
     IMapRepository map,
+    IBonusCardRepository bonusCards,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     GameAccess access)
@@ -45,7 +46,23 @@ public sealed class GameService(
     {
         var game = await access.RequireHostAsync(id, ct);
         var graph = await map.GetGraphAsync(ct);
-        return await ApplyAsync(game, g => g.Start(graph, Random.Shared), ct);
+        var mapTerritories = await map.GetTerritoriesAsync(ct);
+        game.Start(graph, Random.Shared);
+        var existingCards = await bonusCards.GetByGameIdAsync(id, null, ct);
+        if (existingCards.Count == 0)
+        {
+            for (var index = 0; index < mapTerritories.Count; index++)
+            {
+                var territory = mapTerritories[index];
+                bonusCards.Add(new BonusCard(id, CardTypeFor(index), territory.Id));
+            }
+
+            bonusCards.Add(new BonusCard(id, BonusCardType.Wild));
+            bonusCards.Add(new BonusCard(id, BonusCardType.Wild));
+        }
+
+        await unitOfWork.SaveChangesAsync(ct);
+        return GameDetailResponse.From(game);
     }
 
     public Task<GameDetailResponse> EndAsync(Guid id, CancellationToken ct = default) =>
@@ -56,6 +73,7 @@ public sealed class GameService(
         var game = await access.RequireParticipantWithDetailsAsync(id, ct);
         var graph = await map.GetGraphAsync(ct);
         var player = access.RequireCurrentPlayer(game);
+        await access.EnsureForcedCardTradeCompletedAsync(game, player.Id, ct);
 
         game.EndPhase(player.Id, request.Phase, graph, DateTimeOffset.UtcNow);
         await unitOfWork.SaveChangesAsync(ct);
@@ -67,6 +85,7 @@ public sealed class GameService(
         var game = await access.RequireParticipantWithDetailsAsync(id, ct);
         var graph = await map.GetGraphAsync(ct);
         var player = access.RequireCurrentPlayer(game);
+        await access.EnsureForcedCardTradeCompletedAsync(game, player.Id, ct);
         var from = game.Territories.FirstOrDefault(t => t.Id == request.FromTerritoryId)
                    ?? throw new NotFoundException("Origin territory", request.FromTerritoryId);
         var to = game.Territories.FirstOrDefault(t => t.Id == request.ToTerritoryId)
@@ -106,4 +125,12 @@ public sealed class GameService(
         await unitOfWork.SaveChangesAsync(ct);
         return GameDetailResponse.From(game);
     }
+
+    private static BonusCardType CardTypeFor(int index) =>
+        (index % 3) switch
+        {
+            0 => BonusCardType.Infantry,
+            1 => BonusCardType.Cavalry,
+            _ => BonusCardType.Artillery
+        };
 }

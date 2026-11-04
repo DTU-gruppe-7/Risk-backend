@@ -409,6 +409,25 @@ public class GameTests
     }
 
     [Fact]
+    public void FinishWithWinner_records_winner_and_blocks_further_actions()
+    {
+        var game = new Game(Host);
+        var winner = game.AddPlayer(Guid.NewGuid(), "red");
+        var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+
+        foreach (var territory in game.Territories.Where(t => t.OwnerId == opponent.Id).ToList())
+            territory.TransferOwnership(winner.Id, 1);
+
+        game.FinishWithWinner(winner.Id);
+
+        Assert.Equal(GameState.Finished, game.State);
+        Assert.Equal(winner.Id, game.WinnerId);
+        Assert.Throws<BusinessRuleException>(() =>
+            game.DeployTroops(winner.Id, game.Territories.First(t => t.OwnerId == winner.Id), 1));
+    }
+
+    [Fact]
     public void Every_change_bumps_the_version()
     {
         var game = new Game(Host);

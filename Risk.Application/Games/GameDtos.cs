@@ -6,6 +6,7 @@ namespace Risk.Application.Games;
 /// <param name="Id">Game ID.</param>
 /// <param name="HostId">Domain user ID of the host.</param>
 /// <param name="State">Current game state.</param>
+/// <param name="WinnerId">Winning player ID, or null until a player wins.</param>
 /// <param name="PlayerCount">Number of players currently in the game.</param>
 /// <param name="MaxPlayers">Maximum players allowed (from settings).</param>
 /// <param name="CreatedAt">When the game was created.</param>
@@ -31,7 +32,7 @@ public sealed record GameSummaryResponse(
 /// <param name="EndedAt">When the game ended (null if not finished).</param>
 /// <param name="TurnStartedAt">When the current player's turn started.</param>
 public sealed record GameDetailResponse(
-    Guid Id, long Version, Guid HostId, GameState State,
+    Guid Id, long Version, Guid HostId, GameState State, Guid? WinnerId,
     Guid? CurrentPlayerId, GamePhase CurrentPhase,
     GameSettingResponse? Settings,
     IEnumerable<PlayerSummaryResponse> Players,
@@ -39,7 +40,7 @@ public sealed record GameDetailResponse(
     DateTimeOffset? TurnStartedAt)
 {
     internal static GameDetailResponse From(Game g) =>
-        new(g.Id, g.Version, g.HostId, g.State, g.CurrentPlayerId, g.CurrentPhase,
+        new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
             g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
             g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);

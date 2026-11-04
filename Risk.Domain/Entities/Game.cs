@@ -24,6 +24,8 @@ public sealed class Game
 
     public GameState State { get; private set; } = GameState.Lobby;
 
+    public Guid? WinnerId { get; private set; }
+
     /// <summary>The player whose turn it currently is.</summary>
     public Guid? CurrentPlayerId { get; private set; }
 
@@ -34,6 +36,7 @@ public sealed class Game
     public DateTimeOffset? TurnStartedAt { get; private set; }
     public DateTimeOffset? EndedAt { get; private set; }
     public bool HasConqueredTerritoryThisTurn { get; private set; }
+    public int BonusCardTradeCount { get; private set; }
     public Guid? PendingConquestFromTerritoryId { get; private set; }
     public Guid? PendingConquestToTerritoryId { get; private set; }
 
@@ -203,6 +206,72 @@ public sealed class Game
         EndedAt = DateTimeOffset.UtcNow;
         BumpVersion();
     }
+
+    public void FinishWithWinner(Guid playerId)
+    {
+        EnsureState(GameState.InProgress, "A game can only be won while it is in progress.");
+        var player = RequirePlayer(playerId);
+        if (player.IsEliminated)
+            throw new BusinessRuleException("An eliminated player cannot win the game.");
+
+        WinnerId = player.Id;
+        State = GameState.Finished;
+        CurrentPlayerId = null;
+        EndedAt = DateTimeOffset.UtcNow;
+        BumpVersion();
+    }
+
+    public bool ControlsAllTerritories(Guid playerId) =>
+        _territories.Any() &&
+        _territories.Where(territory => !territory.IsBlizzard)
+            .All(territory => territory.OwnerId == playerId);
+
+    public int TradeBonusCards(Guid playerId, IReadOnlyList<BonusCard> cards)
+    {
+        EnsureState(GameState.InProgress, "Cards can only be traded while the game is in progress.");
+        if (CurrentPlayerId != playerId || CurrentPhase != GamePhase.Deployment)
+            throw new BusinessRuleException("Cards can only be traded during the current player's Deployment phase.");
+        if (cards.Count != 3 || cards.Any(card => card.PlayerId != playerId || card.Used))
+            throw new BusinessRuleException("You must trade three unused cards from your own hand.");
+        if (!IsValidTrade(cards))
+            throw new BusinessRuleException("The selected cards do not form a valid combination.");
+
+        var player = RequirePlayer(playerId);
+        var matchingTerritoryBonus = cards.Count(card =>
+            card.TerritoryIdentifier is not null &&
+            _territories.Any(territory =>
+                territory.OwnerId == playerId &&
+                territory.Identifier == card.TerritoryIdentifier));
+        var troops = TradeInValue(BonusCardTradeCount++) + matchingTerritoryBonus * 2;
+
+        foreach (var card in cards)
+            card.MarkAsUsed();
+        player.AddTradeInReinforcements(troops);
+        BumpVersion();
+        return troops;
+    }
+
+    private static bool IsValidTrade(IReadOnlyList<BonusCard> cards)
+    {
+        var nonWild = cards.Where(card => card.Type != BonusCardType.Wild).ToList();
+        var hasWild = nonWild.Count != cards.Count;
+        var threeOfAKind = nonWild.Count == 3 && nonWild.Select(card => card.Type).Distinct().Count() == 1;
+        var oneOfEach = nonWild.Count == 3 &&
+                        nonWild.Select(card => card.Type).Distinct().Count() == 3;
+        return hasWild || threeOfAKind || oneOfEach;
+    }
+
+    private static int TradeInValue(int tradeNumber) =>
+        tradeNumber switch
+        {
+            0 => 4,
+            1 => 6,
+            2 => 8,
+            3 => 10,
+            4 => 12,
+            5 => 15,
+            _ => 15 + (tradeNumber - 5) * 5
+        };
 
     public void EndPhase(Guid playerId, GamePhase expectedNextPhase, MapGraph map, DateTimeOffset now)
     {

@@ -183,6 +183,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("BonusCardTradeCount")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -223,6 +226,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
+
+                    b.Property<Guid?>("WinnerId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -283,7 +289,19 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ObjectiveType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid?>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetIdentifier")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("TargetPlayerId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Title")

@@ -57,6 +57,8 @@ public sealed class Player
         ReinforcementTroops += Guard.Positive(troops, nameof(troops));
     }
 
+    internal void AddTradeInReinforcements(int troops) => AddReinforcements(troops);
+
     internal void PlaceTroops(int troops)
     {
         Guard.Positive(troops, nameof(troops));

@@ -2,6 +2,7 @@ using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Domain.Entities;
+using Risk.Domain.Exceptions;
 
 namespace Risk.Application.Common;
 
@@ -9,7 +10,10 @@ namespace Risk.Application.Common;
 /// Loads a game and checks what the current user may do with it.
 /// Every use case asks here, so the access rules exist in one place.
 /// </summary>
-public sealed class GameAccess(IGameRepository games, ICurrentUser currentUser)
+public sealed class GameAccess(
+    IGameRepository games,
+    ICurrentUser currentUser,
+    IBonusCardRepository bonusCards)
 {
     public async Task<Game> RequireGameAsync(Guid gameId, CancellationToken ct = default) =>
         await games.GetAsync(gameId, ct) ?? throw new NotFoundException("Game", gameId);
@@ -41,6 +45,15 @@ public sealed class GameAccess(IGameRepository games, ICurrentUser currentUser)
     public Player RequireCurrentPlayer(Game game) =>
         game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)
         ?? throw new ForbiddenException("You are not a player in this game.");
+
+    public async Task EnsureForcedCardTradeCompletedAsync(
+        Game game, Guid playerId, CancellationToken ct = default)
+    {
+        var hand = await bonusCards.GetByPlayerIdAsync(game.Id, playerId, ct);
+        if (hand.Count >= 5)
+            throw new BusinessRuleException(
+                "Players with five or more cards must trade in three cards before continuing.");
+    }
 
     /// <summary>The game, if the current user is its host.</summary>
     public async Task<Game> RequireHostAsync(Guid gameId, CancellationToken ct = default)

@@ -375,12 +375,12 @@
         }
       }
     },
-    "/api/games/{gameId}/bonus-cards/{id}/use": {
-      "put": {
+    "/api/games/{gameId}/bonus-cards/trade-in": {
+      "post": {
         "tags": [
           "BonusCards"
         ],
-        "summary": "Marks a bonus card as used (traded in for reinforcements).",
+        "summary": "Trades exactly three cards for escalating reinforcement troops.",
         "parameters": [
           {
             "name": "gameId",
@@ -390,60 +390,71 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": "Card marked as used.",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
+                  "$ref": "#/components/schemas/TradeCardsResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
+                  "$ref": "#/components/schemas/TradeCardsResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
+                  "$ref": "#/components/schemas/TradeCardsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
                 }
               }
             }
           },
           "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Card not found.",
+            "description": "Forbidden",
             "content": {
               "text/plain": {
                 "schema": {
@@ -463,7 +474,7 @@
             }
           },
           "409": {
-            "description": "Card already used.",
+            "description": "Conflict",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3429,6 +3440,7 @@
           "version",
           "hostId",
           "state",
+          "winnerId",
           "currentPlayerId",
           "currentPhase",
           "settings",
@@ -3458,6 +3470,13 @@
           },
           "state": {
             "$ref": "#/components/schemas/GameState"
+          },
+          "winnerId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "currentPlayerId": {
             "type": [
@@ -3723,7 +3742,10 @@
           "playerId",
           "title",
           "description",
-          "isCompleted"
+          "isCompleted",
+          "objectiveType",
+          "targetIdentifier",
+          "targetPlayerId"
         ],
         "type": "object",
         "properties": {
@@ -3750,8 +3772,27 @@
           },
           "isCompleted": {
             "type": "boolean"
+          },
+          "objectiveType": {
+            "$ref": "#/components/schemas/MissionObjectiveType"
+          },
+          "targetIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetPlayerId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
+      },
+      "MissionObjectiveType": {
+        "type": "integer"
       },
       "PingResponse": {
         "required": [
@@ -3967,6 +4008,37 @@
           },
           "isBlizzard": {
             "type": "boolean"
+          }
+        }
+      },
+      "TradeCardsRequest": {
+        "required": [
+          "cardIds"
+        ],
+        "type": "object",
+        "properties": {
+          "cardIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "TradeCardsResponse": {
+        "required": [
+          "troopsAwarded"
+        ],
+        "type": "object",
+        "properties": {
+          "troopsAwarded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

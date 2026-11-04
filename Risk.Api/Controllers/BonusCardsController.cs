@@ -37,16 +37,13 @@ public sealed class BonusCardsController(BonusCardService cards) : ControllerBas
     public async Task<ActionResult<BonusCardResponse>> Assign(Guid gameId, Guid id, [FromBody] AssignCardRequest request, CancellationToken ct)
         => Ok(await cards.AssignAsync(gameId, id, request, ct));
 
-    /// <summary>Marks a bonus card as used (traded in for reinforcements).</summary>
-    /// <response code="200">Card marked as used.</response>
-    /// <response code="403">Caller is not part of the game.</response>
-    /// <response code="404">Card not found.</response>
-    /// <response code="409">Card already used.</response>
-    [HttpPut("{id:guid}/use")]
-    [ProducesResponseType<BonusCardResponse>(StatusCodes.Status200OK)]
+    /// <summary>Trades exactly three cards for escalating reinforcement troops.</summary>
+    [HttpPost("trade-in")]
+    [ProducesResponseType<TradeCardsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<BonusCardResponse>> Use(Guid gameId, Guid id, CancellationToken ct)
-        => Ok(await cards.UseAsync(gameId, id, ct));
+    public async Task<ActionResult<TradeCardsResponse>> Trade(
+        Guid gameId, [FromBody] TradeCardsRequest request, CancellationToken ct)
+        => Ok(await cards.TradeAsync(gameId, request, ct));
 }
