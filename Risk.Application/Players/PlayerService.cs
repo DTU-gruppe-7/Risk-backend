@@ -12,6 +12,8 @@ namespace Risk.Application.Players;
 /// </summary>
 public sealed class PlayerService(
     IPlayerRepository players,
+    IBonusCardRepository bonusCards,
+    IMissionCardRepository missionCards,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     GameAccess access)
@@ -51,15 +53,22 @@ public sealed class PlayerService(
         await unitOfWork.SaveChangesAsync(ct);
     }
 
-    public Task<PlayerDetailResponse> EliminateAsync(Guid gameId, Guid id, CancellationToken ct = default) =>
-        ChangeAsync(gameId, id, game => game.EliminatePlayer(id), ct);
-
-    private async Task<PlayerDetailResponse> ChangeAsync(Guid gameId, Guid id, Action<Game> change, CancellationToken ct)
+    public async Task<PlayerDetailResponse> EliminateAsync(
+        Guid gameId, Guid id, CancellationToken ct = default)
     {
-        var game = await access.RequireParticipantAsync(gameId, ct);
+        var game = await access.RequireHostWithDetailsAsync(gameId, ct);
         var player = RequirePlayer(game, id);
 
-        change(game);
+        if (!game.EliminatePlayer(id))
+            return PlayerDetailResponse.From(player);
+
+        var cards = await bonusCards.GetByPlayerIdAsync(gameId, id, ct);
+        foreach (var card in cards)
+            card.ReturnToDeck();
+
+        var mission = await missionCards.GetByPlayerIdAsync(gameId, id, ct);
+        mission?.ReleaseFromPlayer();
+
         await unitOfWork.SaveChangesAsync(ct);
         return PlayerDetailResponse.From(player);
     }

@@ -14,6 +14,7 @@ public sealed class GameplayService(
     GameAccess access,
     IMapRepository mapRepository,
     IBonusCardRepository bonusCards,
+    IMissionCardRepository missionCards,
     IUnitOfWork unitOfWork,
     IDiceRoller diceRoller) : IGameplayService
 {
@@ -56,8 +57,13 @@ public sealed class GameplayService(
             }
 
             troopsMoved = dto.MovingTroopsCount.Value;
+            var defeatedPlayerId = context.To.OwnerId
+                                   ?? throw new BusinessRuleException(
+                                       "A conquered territory must have an owner.");
             context.From.RemoveTroops(troopsMoved);
             context.To.TransferOwnership(context.PlayerId, troopsMoved);
+            await HandleEliminationAsync(
+                context.Game, defeatedPlayerId, context.PlayerId, cancellationToken);
             bonusCardAwarded = await AwardConquestCardAsync(
                 context.Game, context.PlayerId, cancellationToken);
         }
@@ -116,9 +122,14 @@ public sealed class GameplayService(
             }
             else
             {
+                var defeatedPlayerId = context.To.OwnerId
+                                       ?? throw new BusinessRuleException(
+                                           "A conquered territory must have an owner.");
                 CompletePendingConquest(
                     context.Game, context.PlayerId, context.From, context.To,
                     dto.MovingTroopsCount.Value);
+                await HandleEliminationAsync(
+                    context.Game, defeatedPlayerId, context.PlayerId, cancellationToken);
                 troopsMoved = dto.MovingTroopsCount.Value;
                 bonusCardAwarded = await AwardConquestCardAsync(
                     context.Game, context.PlayerId, cancellationToken);
@@ -147,7 +158,11 @@ public sealed class GameplayService(
         var from = FindTerritory(game, dto.FromTerritoryId, "Origin territory");
         var to = FindTerritory(game, dto.ToTerritoryId, "Target territory");
 
+        var defeatedPlayerId = to.OwnerId
+                               ?? throw new BusinessRuleException(
+                                   "A conquered territory must have an owner.");
         CompletePendingConquest(game, playerId, from, to, dto.MovingTroopsCount);
+        await HandleEliminationAsync(game, defeatedPlayerId, playerId, cancellationToken);
         await AwardConquestCardAsync(game, playerId, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
@@ -204,6 +219,25 @@ public sealed class GameplayService(
                          "Attacking player is not part of the game.");
         card.AssignToPlayer(player.Id);
         return true;
+    }
+
+    private async Task HandleEliminationAsync(
+        Game game,
+        Guid defeatedPlayerId,
+        Guid attackerId,
+        CancellationToken cancellationToken)
+    {
+        if (!game.EliminatePlayer(defeatedPlayerId))
+            return;
+
+        var defeatedCards = await bonusCards.GetByPlayerIdAsync(
+            game.Id, defeatedPlayerId, cancellationToken);
+        foreach (var card in defeatedCards)
+            card.AssignToPlayer(attackerId);
+
+        var mission = await missionCards.GetByPlayerIdAsync(
+            game.Id, defeatedPlayerId, cancellationToken);
+        mission?.ReleaseFromPlayer();
     }
 
     private static void ApplyBattleLosses(

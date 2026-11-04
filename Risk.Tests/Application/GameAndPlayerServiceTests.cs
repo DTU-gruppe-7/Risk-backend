@@ -20,7 +20,13 @@ public class GameAndPlayerServiceTests
         _currentUser = new FakeCurrentUser(_host);
         var access = new GameAccess(_games, _currentUser);
         _gameService = new GameService(_games, new FakeMapRepository(), _unitOfWork, _currentUser, access);
-        _playerService = new PlayerService(new FakePlayerRepository(_games), _unitOfWork, _currentUser, access);
+        _playerService = new PlayerService(
+            new FakePlayerRepository(_games),
+            new FakeBonusCardRepository(),
+            new FakeMissionCardRepository(),
+            _unitOfWork,
+            _currentUser,
+            access);
     }
 
     private async Task<GameDetailResponse> CreateGameAsync() =>

@@ -51,6 +51,15 @@ public sealed class GameAccess(IGameRepository games, ICurrentUser currentUser)
         return game;
     }
 
+    public async Task<Game> RequireHostWithDetailsAsync(Guid gameId, CancellationToken ct = default)
+    {
+        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
+                   ?? throw new NotFoundException("Game", gameId);
+        if (!game.IsHost(currentUser.UserId))
+            throw new ForbiddenException("Only the host can do this.");
+        return game;
+    }
+
     /// <summary>Validates that a player id from the request belongs to the game.</summary>
     public static Player RequirePlayerInGame(Game game, Guid playerId) =>
         game.FindPlayer(playerId)

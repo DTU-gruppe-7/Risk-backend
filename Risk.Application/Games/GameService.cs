@@ -55,8 +55,7 @@ public sealed class GameService(
     {
         var game = await access.RequireParticipantWithDetailsAsync(id, ct);
         var graph = await map.GetGraphAsync(ct);
-        var player = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId)
-                     ?? throw new ForbiddenException("Only a player can end a phase.");
+        var player = access.RequireCurrentPlayer(game);
 
         game.EndPhase(player.Id, request.Phase, graph, DateTimeOffset.UtcNow);
         await unitOfWork.SaveChangesAsync(ct);
@@ -67,8 +66,7 @@ public sealed class GameService(
     {
         var game = await access.RequireParticipantWithDetailsAsync(id, ct);
         var graph = await map.GetGraphAsync(ct);
-        var player = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId)
-                     ?? throw new ForbiddenException("Only a player can fortify.");
+        var player = access.RequireCurrentPlayer(game);
         var from = game.Territories.FirstOrDefault(t => t.Id == request.FromTerritoryId)
                    ?? throw new NotFoundException("Origin territory", request.FromTerritoryId);
         var to = game.Territories.FirstOrDefault(t => t.Id == request.ToTerritoryId)

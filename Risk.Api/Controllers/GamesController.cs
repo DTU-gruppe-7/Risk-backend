@@ -86,7 +86,9 @@ public sealed class GamesController(GameService games) : ControllerBase
     /// <response code="409">Fortification is not allowed in the current game state.</response>
     [HttpPut("{id:guid}/fortify")]
     [ProducesResponseType<GameDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<GameDetailResponse>> Fortify(Guid id, [FromBody] FortifyRequest request, CancellationToken ct)
         => Ok(await games.FortifyAsync(id, request, ct));

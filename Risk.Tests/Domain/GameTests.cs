@@ -396,8 +396,12 @@ public class GameTests
     {
         var game = new Game(Host);
         var player = game.AddPlayer(Guid.NewGuid(), "red");
-        game.AddPlayer(Guid.NewGuid(), "blue");
+        var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
         game.Start(Map, new Random(1));
+
+        foreach (var territory in game.Territories.Where(t => t.OwnerId == player.Id).ToList())
+            territory.TransferOwnership(opponent.Id, 1);
+
         game.EliminatePlayer(player.Id);
 
         Assert.Throws<BusinessRuleException>(() =>

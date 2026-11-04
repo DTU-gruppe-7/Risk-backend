@@ -58,4 +58,10 @@ public sealed class MissionCard
 
         IsCompleted = true;
     }
+
+    public void ReleaseFromPlayer()
+    {
+        PlayerId = null;
+        IsCompleted = false;
+    }
 }

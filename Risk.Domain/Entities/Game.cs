@@ -370,10 +370,18 @@ public sealed class Game
         BumpVersion();
     }
 
-    public void EliminatePlayer(Guid playerId)
+    public bool EliminatePlayer(Guid playerId)
     {
-        RequirePlayer(playerId).Eliminate();
+        EnsureState(GameState.InProgress, "A player can only be eliminated while the game is in progress.");
+        var player = RequirePlayer(playerId);
+        if (player.IsEliminated)
+            return false;
+        if (_territories.Any(territory => territory.OwnerId == playerId))
+            throw new BusinessRuleException("A player can only be eliminated after losing all territories.");
+
+        player.Eliminate();
         BumpVersion();
+        return true;
     }
 
     // -------------------------------------------------------------------------

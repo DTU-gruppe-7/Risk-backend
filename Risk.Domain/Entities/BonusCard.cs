@@ -59,6 +59,14 @@ public sealed class BonusCard
         Used = true;
         PlayerId = null;
     }
+
+    public void ReturnToDeck()
+    {
+        if (Used)
+            return;
+
+        PlayerId = null;
+    }
 }
 
 public enum BonusCardType

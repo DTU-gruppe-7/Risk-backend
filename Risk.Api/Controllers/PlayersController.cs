@@ -60,10 +60,11 @@ public sealed class PlayersController(PlayerService players) : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Marks a player as eliminated.</summary>
+    /// <summary>Administrative fallback for eliminating a player who owns no territories. Only the game host may call it.</summary>
     /// <response code="200">Player eliminated.</response>
-    /// <response code="403">Caller is not part of the game.</response>
+    /// <response code="403">Caller is not the game host.</response>
     /// <response code="404">Player not found.</response>
+    /// <response code="409">The player still owns territories or the game is not in progress.</response>
     [HttpPut("{id:guid}/eliminate")]
     [ProducesResponseType<PlayerDetailResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
