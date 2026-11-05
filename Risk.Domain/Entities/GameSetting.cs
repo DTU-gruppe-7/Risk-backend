@@ -28,7 +28,8 @@ public sealed class GameSetting
     public bool HasFogOfWar { get; private set; } = false;
 
     /// <summary>When true, each player receives a secret mission card as a win condition.</summary>
-    public bool HasMissions { get; private set; } = false;
+    public GameVictoryMode VictoryMode { get; private set; } = GameVictoryMode.CompleteConquest;
+    public bool HasMissions => VictoryMode == GameVictoryMode.Mission;
 
     /// <summary>
     /// Blizzard game mode: how many territories become impassable when the game starts.
@@ -45,21 +46,29 @@ public sealed class GameSetting
     private GameSetting() { }
 
     public GameSetting(Guid gameId, int maxPlayers = DefaultMaxPlayers, int timer = 0, int turnTimeLimit = 0,
-        bool hasFogOfWar = false, bool hasMissions = false, int blizzardCount = 0)
+        bool hasFogOfWar = false, bool hasMissions = false, int blizzardCount = 0,
+        GameVictoryMode? victoryMode = null)
     {
         GameId = Guard.NotEmpty(gameId, nameof(gameId));
-        Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount);
+        Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount, victoryMode);
     }
 
     internal void Update(int maxPlayers, int timer, int turnTimeLimit, bool hasFogOfWar, bool hasMissions,
-        int blizzardCount = 0)
+        int blizzardCount = 0, GameVictoryMode? victoryMode = null)
     {
         MaxPlayers = Guard.InRange(maxPlayers, MinPlayers, DefaultMaxPlayers, nameof(maxPlayers));
         Timer = Guard.NotNegative(timer, nameof(timer));
         TurnTimeLimit = Guard.NotNegative(turnTimeLimit, nameof(turnTimeLimit));
         HasFogOfWar = hasFogOfWar;
-        HasMissions = hasMissions;
+        VictoryMode = victoryMode ?? (hasMissions ? GameVictoryMode.Mission : GameVictoryMode.CompleteConquest);
         // The upper limit depends on the map, so BlizzardPlacement checks it when the game starts.
         BlizzardCount = Guard.NotNegative(blizzardCount, nameof(blizzardCount));
     }
+
+}
+
+public enum GameVictoryMode
+{
+    CompleteConquest,
+    Mission
 }

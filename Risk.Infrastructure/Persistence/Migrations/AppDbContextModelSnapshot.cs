@@ -17,7 +17,7 @@ namespace Risk.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -183,6 +183,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("BonusCardTradeCount")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -197,7 +200,16 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("EndedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("HasConqueredTerritoryThisTurn")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("HostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PendingConquestFromTerritoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PendingConquestToTerritoryId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("StartedAt")
@@ -208,9 +220,15 @@ namespace Risk.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<DateTimeOffset?>("TurnStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
+
+                    b.Property<Guid?>("WinnerId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -235,9 +253,6 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<bool>("HasFogOfWar")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("HasMissions")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("MaxPlayers")
                         .HasColumnType("integer");
 
@@ -246,6 +261,11 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("TurnTimeLimit")
                         .HasColumnType("integer");
+
+                    b.Property<string>("VictoryMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
 
@@ -271,7 +291,19 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ObjectiveType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid?>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetIdentifier")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("TargetPlayerId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Title")

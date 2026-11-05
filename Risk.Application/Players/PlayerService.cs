@@ -12,21 +12,25 @@ namespace Risk.Application.Players;
 /// </summary>
 public sealed class PlayerService(
     IPlayerRepository players,
+    IBonusCardRepository bonusCards,
+    IMissionCardRepository missionCards,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
-    GameAccess access)
+    GameAccess access,
+    FogOfWar fogOfWar)
 {
     public async Task<IReadOnlyList<PlayerDetailResponse>> GetAllAsync(Guid gameId, CancellationToken ct = default)
     {
-        await access.EnsureGameExistsAsync(gameId, ct);
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
         var list = await players.GetPlayersByGameIdAsync(gameId, ct);
-        return list.Select(PlayerDetailResponse.From).ToList();
+        return list.Select(player => ToResponse(game, player)).ToList();
     }
 
     public async Task<PlayerDetailResponse> GetByIdAsync(Guid gameId, Guid id, CancellationToken ct = default)
     {
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
         var player = await players.GetAsync(gameId, id, ct) ?? throw new NotFoundException("Player", id);
-        return PlayerDetailResponse.From(player);
+        return ToResponse(game, player);
     }
 
     /// <summary>Joins the game as the current user.</summary>
@@ -51,22 +55,31 @@ public sealed class PlayerService(
         await unitOfWork.SaveChangesAsync(ct);
     }
 
-    public Task<PlayerDetailResponse> EliminateAsync(Guid gameId, Guid id, CancellationToken ct = default) =>
-        ChangeAsync(gameId, id, game => game.EliminatePlayer(id), ct);
-
-    public Task<PlayerDetailResponse> ReinforceAsync(Guid gameId, Guid id, ReinforceRequest request, CancellationToken ct = default) =>
-        ChangeAsync(gameId, id, game => game.ReinforcePlayer(id, request.Troops), ct);
-
-    private async Task<PlayerDetailResponse> ChangeAsync(Guid gameId, Guid id, Action<Game> change, CancellationToken ct)
+    public async Task<PlayerDetailResponse> EliminateAsync(
+        Guid gameId, Guid id, CancellationToken ct = default)
     {
-        var game = await access.RequireParticipantAsync(gameId, ct);
+        var game = await access.RequireHostWithDetailsAsync(gameId, ct);
         var player = RequirePlayer(game, id);
 
-        change(game);
+        if (!game.EliminatePlayer(id))
+            return PlayerDetailResponse.From(player);
+
+        var cards = await bonusCards.GetByPlayerIdAsync(gameId, id, ct);
+        foreach (var card in cards)
+            card.ReturnToDeck();
+
+        var mission = await missionCards.GetByPlayerIdAsync(gameId, id, ct);
+        mission?.ReleaseFromPlayer();
+
         await unitOfWork.SaveChangesAsync(ct);
         return PlayerDetailResponse.From(player);
     }
 
     private static Player RequirePlayer(Game game, Guid id) =>
         game.FindPlayer(id) ?? throw new NotFoundException("Player", id);
+
+    private PlayerDetailResponse ToResponse(Game game, Player player) =>
+        fogOfWar.IsActive(game)
+            ? PlayerDetailResponse.From(player, fogOfWar.ViewerPlayerId(game))
+            : PlayerDetailResponse.From(player);
 }

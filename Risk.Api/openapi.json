@@ -438,12 +438,12 @@
         }
       }
     },
-    "/api/games/{gameId}/bonus-cards/{id}/use": {
-      "put": {
+    "/api/games/{gameId}/bonus-cards/trade-in": {
+      "post": {
         "tags": [
           "BonusCards"
         ],
-        "summary": "Marks a bonus card as used (traded in for reinforcements).",
+        "summary": "Trades exactly three cards for escalating reinforcement troops.",
         "parameters": [
           {
             "name": "gameId",
@@ -453,60 +453,71 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": "Card marked as used.",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
+                  "$ref": "#/components/schemas/TradeCardsResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
+                  "$ref": "#/components/schemas/TradeCardsResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
+                  "$ref": "#/components/schemas/TradeCardsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
                 }
               }
             }
           },
           "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Card not found.",
+            "description": "Forbidden",
             "content": {
               "text/plain": {
                 "schema": {
@@ -526,7 +537,7 @@
             }
           },
           "409": {
-            "description": "Card already used.",
+            "description": "Conflict",
             "content": {
               "text/plain": {
                 "schema": {
@@ -544,6 +555,329 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/games/{gameId}/gameplay/attack": {
+      "post": {
+        "tags": [
+          "Gameplay"
+        ],
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttackRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttackRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttackResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttackResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttackResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{gameId}/gameplay/blitz": {
+      "post": {
+        "tags": [
+          "Gameplay"
+        ],
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlitzRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlitzRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlitzRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlitzResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlitzResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlitzResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{gameId}/gameplay/conquest": {
+      "post": {
+        "tags": [
+          "Gameplay"
+        ],
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConquestRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConquestRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConquestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -933,7 +1267,7 @@
         "tags": [
           "Games"
         ],
-        "summary": "Sets the current game phase (Deployment / Attack / Fortify).",
+        "summary": "Ends the current phase and advances to the next phase or player turn.",
         "parameters": [
           {
             "name": "id",
@@ -1049,12 +1383,12 @@
         }
       }
     },
-    "/api/games/{id}/current-player": {
+    "/api/games/{id}/fortify": {
       "put": {
         "tags": [
           "Games"
         ],
-        "summary": "Sets which player's turn it currently is.",
+        "summary": "Moves troops along a connected path during Fortify and ends the turn.",
         "parameters": [
           {
             "name": "id",
@@ -1070,17 +1404,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetCurrentPlayerRequest"
+                "$ref": "#/components/schemas/FortifyRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetCurrentPlayerRequest"
+                "$ref": "#/components/schemas/FortifyRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/SetCurrentPlayerRequest"
+                "$ref": "#/components/schemas/FortifyRequest"
               }
             }
           },
@@ -1088,7 +1422,7 @@
         },
         "responses": {
           "200": {
-            "description": "Current player updated.",
+            "description": "Troops moved and the next player's Deployment phase started.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1108,27 +1442,7 @@
             }
           },
           "400": {
-            "description": "The player is not part of this game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Caller is not part of the game.",
+            "description": "Bad Request",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1148,7 +1462,27 @@
             }
           },
           "404": {
-            "description": "Game not found.",
+            "description": "Game or territory not found.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1168,7 +1502,7 @@
             }
           },
           "409": {
-            "description": "Game is not in progress, or the player is eliminated.",
+            "description": "Fortification is not allowed in the current game state.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2155,7 +2489,7 @@
         "tags": [
           "Players"
         ],
-        "summary": "Marks a player as eliminated.",
+        "summary": "Administrative fallback for eliminating a player who owns no territories. Only the game host may call it.",
         "parameters": [
           {
             "name": "gameId",
@@ -2198,137 +2532,7 @@
             }
           },
           "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Player not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/games/{gameId}/players/{id}/reinforce": {
-      "put": {
-        "tags": [
-          "Players"
-        ],
-        "summary": "Adds reinforcement troops to a player's pool.",
-        "parameters": [
-          {
-            "name": "gameId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReinforceRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReinforceRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReinforceRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Troops added.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlayerDetailResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlayerDetailResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlayerDetailResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Troops must be positive.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Caller is not part of the game.",
+            "description": "Caller is not the game host.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2499,286 +2703,6 @@
           },
           "404": {
             "description": "Territory not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/games/{gameId}/territories/{id}/claim": {
-      "put": {
-        "tags": [
-          "Territories"
-        ],
-        "summary": "Claims an unoccupied territory for a player.",
-        "parameters": [
-          {
-            "name": "gameId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClaimTerritoryRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClaimTerritoryRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClaimTerritoryRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Territory claimed.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/TerritoryResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TerritoryResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TerritoryResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid troop count, or the player is not in this game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Territory not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Territory is already occupied, or a blizzard.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/games/{gameId}/territories/{id}/troops": {
-      "put": {
-        "tags": [
-          "Territories"
-        ],
-        "summary": "Adds or removes troops from a territory.",
-        "parameters": [
-          {
-            "name": "gameId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateTroopsRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateTroopsRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateTroopsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Troops updated.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/TerritoryResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TerritoryResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TerritoryResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Territory not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Removing more troops than present, or adding to a blizzard.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3115,6 +3039,116 @@
           }
         }
       },
+      "AttackRequest": {
+        "required": [
+          "fromTerritoryId",
+          "toTerritoryId",
+          "attackingTroopsCount"
+        ],
+        "type": "object",
+        "properties": {
+          "fromTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attackingTroopsCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "defendingTroopsCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 2
+          },
+          "movingTroopsCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AttackResultDto": {
+        "required": [
+          "attackerLosses",
+          "defenderLosses",
+          "attackerDice",
+          "defenderDice",
+          "territoryConquered"
+        ],
+        "type": "object",
+        "properties": {
+          "attackerLosses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "defenderLosses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attackerDice": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "defenderDice": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "territoryConquered": {
+            "type": "boolean"
+          },
+          "troopsMoved": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "bonusCardAwarded": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "AuthResponse": {
         "required": [
           "accessToken",
@@ -3147,6 +3181,148 @@
           },
           "email": {
             "type": "string"
+          }
+        }
+      },
+      "BlitzRequest": {
+        "required": [
+          "fromTerritoryId",
+          "toTerritoryId"
+        ],
+        "type": "object",
+        "properties": {
+          "fromTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movingTroopsCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "BlitzResultDto": {
+        "required": [
+          "totalAttackerLosses",
+          "totalDefenderLosses",
+          "territoryConquered",
+          "remainingAttackingTerritoryTroops",
+          "remainingDefendingTerritoryTroops",
+          "rounds"
+        ],
+        "type": "object",
+        "properties": {
+          "totalAttackerLosses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalDefenderLosses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "territoryConquered": {
+            "type": "boolean"
+          },
+          "remainingAttackingTerritoryTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remainingDefendingTerritoryTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlitzRoundDto"
+            }
+          },
+          "troopsMoved": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "bonusCardAwarded": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "BlitzRoundDto": {
+        "required": [
+          "attackerDice",
+          "defenderDice",
+          "attackerLosses",
+          "defenderLosses"
+        ],
+        "type": "object",
+        "properties": {
+          "attackerDice": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "defenderDice": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "attackerLosses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "defenderLosses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -3193,24 +3369,29 @@
       "BonusCardType": {
         "type": "integer"
       },
-      "ClaimTerritoryRequest": {
+      "ConquestRequest": {
         "required": [
-          "playerId"
+          "fromTerritoryId",
+          "toTerritoryId",
+          "movingTroopsCount"
         ],
         "type": "object",
         "properties": {
-          "playerId": {
+          "fromTerritoryId": {
             "type": "string",
             "format": "uuid"
           },
-          "initialTroops": {
+          "toTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movingTroopsCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "integer",
               "string"
             ],
-            "format": "int32",
-            "default": 1
+            "format": "int32"
           }
         }
       },
@@ -3271,6 +3452,16 @@
               "string"
             ],
             "format": "int32"
+          },
+          "victoryMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GameVictoryMode"
+              }
+            ]
           }
         }
       },
@@ -3290,19 +3481,47 @@
           }
         }
       },
+      "FortifyRequest": {
+        "required": [
+          "fromTerritoryId",
+          "toTerritoryId",
+          "troops"
+        ],
+        "type": "object",
+        "properties": {
+          "fromTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "troops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "GameDetailResponse": {
         "required": [
           "id",
           "version",
           "hostId",
           "state",
+          "winnerId",
           "currentPlayerId",
           "currentPhase",
           "settings",
           "players",
           "createdAt",
           "startedAt",
-          "endedAt"
+          "endedAt",
+          "turnStartedAt"
         ],
         "type": "object",
         "properties": {
@@ -3324,6 +3543,13 @@
           },
           "state": {
             "$ref": "#/components/schemas/GameState"
+          },
+          "winnerId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "currentPlayerId": {
             "type": [
@@ -3368,6 +3594,13 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "turnStartedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -3383,6 +3616,7 @@
           "turnTimeLimit",
           "hasFogOfWar",
           "hasMissions",
+          "victoryMode",
           "blizzardCount"
         ],
         "type": "object",
@@ -3424,6 +3658,9 @@
           },
           "hasMissions": {
             "type": "boolean"
+          },
+          "victoryMode": {
+            "$ref": "#/components/schemas/GameVictoryMode"
           },
           "blizzardCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -3481,6 +3718,9 @@
             "format": "date-time"
           }
         }
+      },
+      "GameVictoryMode": {
+        "type": "integer"
       },
       "JoinGameRequest": {
         "required": [
@@ -3582,7 +3822,10 @@
           "playerId",
           "title",
           "description",
-          "isCompleted"
+          "isCompleted",
+          "objectiveType",
+          "targetIdentifier",
+          "targetPlayerId"
         ],
         "type": "object",
         "properties": {
@@ -3609,8 +3852,27 @@
           },
           "isCompleted": {
             "type": "boolean"
+          },
+          "objectiveType": {
+            "$ref": "#/components/schemas/MissionObjectiveType"
+          },
+          "targetIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetPlayerId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
+      },
+      "MissionObjectiveType": {
+        "type": "integer"
       },
       "PingResponse": {
         "required": [
@@ -3781,34 +4043,6 @@
           }
         }
       },
-      "ReinforceRequest": {
-        "required": [
-          "troops"
-        ],
-        "type": "object",
-        "properties": {
-          "troops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          }
-        }
-      },
-      "SetCurrentPlayerRequest": {
-        "required": [
-          "playerId"
-        ],
-        "type": "object",
-        "properties": {
-          "playerId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
       "SetPhaseRequest": {
         "required": [
           "phase"
@@ -3854,6 +4088,37 @@
           },
           "isBlizzard": {
             "type": "boolean"
+          }
+        }
+      },
+      "TradeCardsRequest": {
+        "required": [
+          "cardIds"
+        ],
+        "type": "object",
+        "properties": {
+          "cardIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "TradeCardsResponse": {
+        "required": [
+          "troopsAwarded"
+        ],
+        "type": "object",
+        "properties": {
+          "troopsAwarded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -3905,22 +4170,16 @@
             ],
             "format": "int32",
             "default": 0
-          }
-        }
-      },
-      "UpdateTroopsRequest": {
-        "required": [
-          "delta"
-        ],
-        "type": "object",
-        "properties": {
-          "delta": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
+          },
+          "victoryMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GameVictoryMode"
+              }
+            ]
           }
         }
       },
@@ -4015,6 +4274,9 @@
     },
     {
       "name": "BonusCards"
+    },
+    {
+      "name": "Gameplay"
     },
     {
       "name": "Games"

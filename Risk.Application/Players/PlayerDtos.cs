@@ -18,12 +18,13 @@ public sealed record PlayerDetailResponse(
     internal static PlayerDetailResponse From(Player p) =>
         new(p.Id, p.GameId, p.UserId, p.Color,
             p.ReinforcementTroops, p.IsEliminated, p.TurnOrder, p.JoinedAt);
+
+    internal static PlayerDetailResponse From(Player p, Guid? viewerPlayerId) =>
+        new(p.Id, p.GameId, p.UserId, p.Color,
+            viewerPlayerId == p.Id ? p.ReinforcementTroops : 0,
+            p.IsEliminated, p.TurnOrder, p.JoinedAt);
 }
 
 /// <summary>Payload to join a game.</summary>
 /// <param name="Color">Requested board colour (e.g. "red", "blue").</param>
 public sealed record JoinGameRequest(string Color);
-
-/// <summary>Payload to add reinforcement troops to a player.</summary>
-/// <param name="Troops">Number of troops to add (must be positive).</param>
-public sealed record ReinforceRequest(int Troops);

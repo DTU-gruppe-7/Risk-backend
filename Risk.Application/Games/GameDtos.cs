@@ -6,6 +6,7 @@ namespace Risk.Application.Games;
 /// <param name="Id">Game ID.</param>
 /// <param name="HostId">Domain user ID of the host.</param>
 /// <param name="State">Current game state.</param>
+/// <param name="WinnerId">Winning player ID, or null until a player wins.</param>
 /// <param name="PlayerCount">Number of players currently in the game.</param>
 /// <param name="MaxPlayers">Maximum players allowed (from settings).</param>
 /// <param name="CreatedAt">When the game was created.</param>
@@ -29,28 +30,40 @@ public sealed record GameSummaryResponse(
 /// <param name="CreatedAt">When the game was created.</param>
 /// <param name="StartedAt">When the game started (null if not yet started).</param>
 /// <param name="EndedAt">When the game ended (null if not finished).</param>
+/// <param name="TurnStartedAt">When the current player's turn started.</param>
 public sealed record GameDetailResponse(
-    Guid Id, long Version, Guid HostId, GameState State,
+    Guid Id, long Version, Guid HostId, GameState State, Guid? WinnerId,
     Guid? CurrentPlayerId, GamePhase CurrentPhase,
     GameSettingResponse? Settings,
     IEnumerable<PlayerSummaryResponse> Players,
-    DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt)
+    DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt,
+    DateTimeOffset? TurnStartedAt)
 {
     internal static GameDetailResponse From(Game g) =>
-        new(g.Id, g.Version, g.HostId, g.State, g.CurrentPlayerId, g.CurrentPhase,
+        new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
             g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
-            g.CreatedAt, g.StartedAt, g.EndedAt);
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
+
+    internal static GameDetailResponse From(Game g, Guid? viewerPlayerId) =>
+        new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
+            g.Settings is null ? null : GameSettingResponse.From(g.Settings),
+            g.Players.OrderBy(p => p.TurnOrder)
+                .Select(p => PlayerSummaryResponse.From(p, viewerPlayerId))
+                .ToList(),
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
 }
 
 /// <summary>Game configuration snapshot.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
 public sealed record GameSettingResponse(
     Guid Id, Guid GameId, int MaxPlayers, int Timer,
-    int TurnTimeLimit, bool HasFogOfWar, bool HasMissions, int BlizzardCount)
+    int TurnTimeLimit, bool HasFogOfWar, bool HasMissions, GameVictoryMode VictoryMode,
+    int BlizzardCount)
 {
     internal static GameSettingResponse From(GameSetting s) =>
-        new(s.Id, s.GameId, s.MaxPlayers, s.Timer, s.TurnTimeLimit, s.HasFogOfWar, s.HasMissions, s.BlizzardCount);
+        new(s.Id, s.GameId, s.MaxPlayers, s.Timer, s.TurnTimeLimit, s.HasFogOfWar,
+            s.HasMissions, s.VictoryMode, s.BlizzardCount);
 }
 
 /// <summary>Lightweight player summary embedded in game responses.</summary>
@@ -59,6 +72,10 @@ public sealed record PlayerSummaryResponse(
 {
     internal static PlayerSummaryResponse From(Player p) =>
         new(p.Id, p.UserId, p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated);
+
+    internal static PlayerSummaryResponse From(Player p, Guid? viewerPlayerId) =>
+        new(p.Id, p.UserId, p.Color, p.TurnOrder,
+            viewerPlayerId == p.Id ? p.ReinforcementTroops : 0, p.IsEliminated);
 }
 
 /// <summary>Payload to create a new game. All fields are optional; defaults apply.</summary>
@@ -70,18 +87,19 @@ public sealed record PlayerSummaryResponse(
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. Default: 0 (off).</param>
 public sealed record CreateGameRequest(
     int? MaxPlayers, int? Timer, int? TurnTimeLimit,
-    bool? HasFogOfWar, bool? HasMissions, int? BlizzardCount = null);
+    bool? HasFogOfWar, bool? HasMissions, int? BlizzardCount = null,
+    GameVictoryMode? VictoryMode = null);
 
 /// <summary>Payload to fully replace game settings.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
 public sealed record UpdateGameSettingRequest(
     int MaxPlayers, int Timer, int TurnTimeLimit,
-    bool HasFogOfWar, bool HasMissions, int BlizzardCount = 0);
+    bool HasFogOfWar, bool HasMissions, int BlizzardCount = 0,
+    GameVictoryMode? VictoryMode = null);
 
 /// <summary>Payload to change the current game phase.</summary>
 /// <param name="Phase">New phase.</param>
 public sealed record SetPhaseRequest(GamePhase Phase);
 
-/// <summary>Payload to set the active player.</summary>
-/// <param name="PlayerId">ID of the player whose turn it now is.</param>
-public sealed record SetCurrentPlayerRequest(Guid PlayerId);
+/// <summary>Payload to move troops during the current player's Fortify phase.</summary>
+public sealed record FortifyRequest(Guid FromTerritoryId, Guid ToTerritoryId, int Troops);
