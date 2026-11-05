@@ -18,22 +18,25 @@ public class GameAndPlayerServiceTests
     public GameAndPlayerServiceTests()
     {
         _currentUser = new FakeCurrentUser(_host);
-        var access = new GameAccess(_games, _currentUser, new FakeBonusCardRepository());
+        var access = new GameAccess(_games, _currentUser);
+        var fogOfWar = new FogOfWar(_currentUser, new FakeMapRepository());
         _gameService = new GameService(
             _games,
             new FakeMapRepository(),
-            new FakeBonusCardRepository(),
-            new FakeMissionCardRepository(),
+            new GameDeckSetup(new FakeBonusCardRepository(), new FakeMissionCardRepository()),
             _unitOfWork,
             _currentUser,
-            access);
+            access,
+            new ForcedCardTradeGuard(new FakeBonusCardRepository()),
+            fogOfWar);
         _playerService = new PlayerService(
             new FakePlayerRepository(_games),
             new FakeBonusCardRepository(),
             new FakeMissionCardRepository(),
             _unitOfWork,
             _currentUser,
-            access);
+            access,
+            fogOfWar);
     }
 
     private async Task<GameDetailResponse> CreateGameAsync() =>

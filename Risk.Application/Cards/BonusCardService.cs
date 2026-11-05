@@ -11,11 +11,15 @@ namespace Risk.Application.Cards;
 public sealed class BonusCardService(
     IBonusCardRepository cards,
     IUnitOfWork unitOfWork,
-    GameAccess access)
+    GameAccess access,
+    FogOfWar fogOfWar)
 {
     public async Task<IReadOnlyList<BonusCardResponse>> GetAllAsync(Guid gameId, Guid? playerId, CancellationToken ct = default)
     {
-        await access.EnsureGameExistsAsync(gameId, ct);
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        if (fogOfWar.IsActive(game))
+            playerId = access.RequireCurrentPlayer(game).Id;
+
         var list = await cards.GetByGameIdAsync(gameId, playerId, ct);
         return list.Select(BonusCardResponse.From).ToList();
     }

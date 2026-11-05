@@ -11,17 +11,31 @@ public sealed class TerritoryService(
     ITerritoryRepository territories,
     IUnitOfWork unitOfWork,
     GameAccess access,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    FogOfWar fogOfWar,
+    ForcedCardTradeGuard forcedCardTrade)
 {
     public async Task<IReadOnlyList<TerritoryResponse>> GetAllAsync(Guid gameId, Guid? ownerId, CancellationToken ct = default)
     {
-        await access.EnsureGameExistsAsync(gameId, ct);
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
         var list = await territories.GetByGameIdAsync(gameId, ownerId, ct);
+        var visible = await fogOfWar.VisibleTerritoriesAsync(game, ct);
+        if (visible is not null)
+            list = list.Where(territory => visible.Contains(territory.Identifier)).ToList();
+
         return list.Select(TerritoryResponse.From).ToList();
     }
 
-    public async Task<TerritoryResponse> GetByIdAsync(Guid gameId, Guid id, CancellationToken ct = default) =>
-        TerritoryResponse.From(await RequireTerritoryAsync(gameId, id, ct));
+    public async Task<TerritoryResponse> GetByIdAsync(Guid gameId, Guid id, CancellationToken ct = default)
+    {
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        var territory = await RequireTerritoryAsync(gameId, id, ct);
+        var visible = await fogOfWar.VisibleTerritoriesAsync(game, ct);
+        if (visible is not null && !visible.Contains(territory.Identifier))
+            throw new NotFoundException("Territory", id);
+
+        return TerritoryResponse.From(territory);
+    }
 
     public async Task<TerritoryResponse> DeployTroopsAsync(Guid gameId, Guid id, DeployTroopsRequest request,
         CancellationToken ct = default)
@@ -32,7 +46,7 @@ public sealed class TerritoryService(
 
         var player = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId)
                      ?? throw new ForbiddenException("Only a player can deploy troops.");
-        await access.EnsureForcedCardTradeCompletedAsync(game, player.Id, ct);
+        await forcedCardTrade.EnsureCompletedAsync(game, player.Id, ct);
         game.DeployTroops(player.Id, territory, request.Troops);
 
         await unitOfWork.SaveChangesAsync(ct);

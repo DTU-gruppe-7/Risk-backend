@@ -15,11 +15,15 @@ namespace Risk.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services, bool includeBackgroundServices = true)
+    public static IServiceCollection AddApplication(this IServiceCollection services)
     {
 
         services.AddScoped<IGameplayService, GameplayService>();
         services.AddScoped<GameAccess>();
+        services.AddScoped<ForcedCardTradeGuard>();
+        services.AddScoped<ConquestResolver>();
+        services.AddScoped<GameDeckSetup>();
+        services.AddScoped<FogOfWar>();
         services.AddScoped<AuthService>();
         services.AddScoped<UserService>();
         services.AddScoped<GameService>();
@@ -28,8 +32,7 @@ public static class DependencyInjection
         services.AddScoped<MapService>();
         services.AddScoped<BonusCardService>();
         services.AddScoped<MissionCardService>();
-        if (includeBackgroundServices)
-            services.AddHostedService<TurnTimeoutWorker>();
+        services.AddScoped<TurnTimeoutService>();
 
 
         return services;

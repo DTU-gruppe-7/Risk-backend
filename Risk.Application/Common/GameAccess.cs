@@ -12,8 +12,7 @@ namespace Risk.Application.Common;
 /// </summary>
 public sealed class GameAccess(
     IGameRepository games,
-    ICurrentUser currentUser,
-    IBonusCardRepository bonusCards)
+    ICurrentUser currentUser)
 {
     public async Task<Game> RequireGameAsync(Guid gameId, CancellationToken ct = default) =>
         await games.GetAsync(gameId, ct) ?? throw new NotFoundException("Game", gameId);
@@ -45,15 +44,6 @@ public sealed class GameAccess(
     public Player RequireCurrentPlayer(Game game) =>
         game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)
         ?? throw new ForbiddenException("You are not a player in this game.");
-
-    public async Task EnsureForcedCardTradeCompletedAsync(
-        Game game, Guid playerId, CancellationToken ct = default)
-    {
-        var hand = await bonusCards.GetByPlayerIdAsync(game.Id, playerId, ct);
-        if (hand.Count >= 5)
-            throw new BusinessRuleException(
-                "Players with five or more cards must trade in three cards before continuing.");
-    }
 
     /// <summary>The game, if the current user is its host.</summary>
     public async Task<Game> RequireHostAsync(Guid gameId, CancellationToken ct = default)

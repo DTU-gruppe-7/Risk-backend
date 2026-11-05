@@ -18,6 +18,11 @@ public sealed record PlayerDetailResponse(
     internal static PlayerDetailResponse From(Player p) =>
         new(p.Id, p.GameId, p.UserId, p.Color,
             p.ReinforcementTroops, p.IsEliminated, p.TurnOrder, p.JoinedAt);
+
+    internal static PlayerDetailResponse From(Player p, Guid? viewerPlayerId) =>
+        new(p.Id, p.GameId, p.UserId, p.Color,
+            viewerPlayerId == p.Id ? p.ReinforcementTroops : 0,
+            p.IsEliminated, p.TurnOrder, p.JoinedAt);
 }
 
 /// <summary>Payload to join a game.</summary>

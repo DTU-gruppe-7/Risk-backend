@@ -44,6 +44,14 @@ public sealed record GameDetailResponse(
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
             g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
             g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
+
+    internal static GameDetailResponse From(Game g, Guid? viewerPlayerId) =>
+        new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
+            g.Settings is null ? null : GameSettingResponse.From(g.Settings),
+            g.Players.OrderBy(p => p.TurnOrder)
+                .Select(p => PlayerSummaryResponse.From(p, viewerPlayerId))
+                .ToList(),
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
 }
 
 /// <summary>Game configuration snapshot.</summary>
@@ -64,6 +72,10 @@ public sealed record PlayerSummaryResponse(
 {
     internal static PlayerSummaryResponse From(Player p) =>
         new(p.Id, p.UserId, p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated);
+
+    internal static PlayerSummaryResponse From(Player p, Guid? viewerPlayerId) =>
+        new(p.Id, p.UserId, p.Color, p.TurnOrder,
+            viewerPlayerId == p.Id ? p.ReinforcementTroops : 0, p.IsEliminated);
 }
 
 /// <summary>Payload to create a new game. All fields are optional; defaults apply.</summary>

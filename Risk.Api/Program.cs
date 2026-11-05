@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Scalar.AspNetCore;
 using Risk.Api.Auth;
+using Risk.Api.BackgroundServices;
 using Risk.Api.ErrorHandling;
 using Risk.Application;
 using Risk.Application.Interfaces;
@@ -66,7 +67,10 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddOpenApi();
-builder.Services.AddApplication(!isDesignTime);
+builder.Services.AddApplication();
+// Build tools (OpenAPI generation, dotnet ef) construct the host without running it, and must not start timers.
+if (!isDesignTime)
+    builder.Services.AddHostedService<TurnTimeoutWorker>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddHttpContextAccessor();

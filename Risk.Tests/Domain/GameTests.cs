@@ -10,7 +10,7 @@ public class GameTests
     private static readonly MapGraph Map = ClassicMap.Graph;
 
     [Fact]
-    public void Start_distributes_playable_territories_and_one_troop_per_territory()
+    public void Start_distributes_playable_territories_and_the_classic_starting_troops()
     {
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
@@ -23,12 +23,19 @@ public class GameTests
         {
             Assert.Equal(game.Id, t.GameId);
             Assert.NotNull(t.OwnerId);
-            Assert.Equal(1, t.TroopCount);
+            Assert.True(t.TroopCount >= 1);
         });
         Assert.Equal(21, game.Territories.Count(t => t.OwnerId == red.Id));
         Assert.Equal(21, game.Territories.Count(t => t.OwnerId == blue.Id));
-        Assert.Equal(22, red.ReinforcementTroops);
-        Assert.Equal(19, blue.ReinforcementTroops);
+
+        // Two players start with 40 troops each, already placed on their territories.
+        Assert.Equal(40, game.Territories.Where(t => t.OwnerId == red.Id).Sum(t => t.TroopCount));
+        Assert.Equal(40, game.Territories.Where(t => t.OwnerId == blue.Id).Sum(t => t.TroopCount));
+
+        // Only the first player has reinforcements to place: territories / 3 (at least 3) plus continent bonus.
+        var expected = Math.Max(3, 21 / 3) + game.BoardOn(Map).ContinentBonusFor(red.Id);
+        Assert.Equal(expected, red.ReinforcementTroops);
+        Assert.Equal(0, blue.ReinforcementTroops);
     }
 
     [Fact]
@@ -56,11 +63,13 @@ public class GameTests
         game.AddPlayer(Guid.NewGuid(), "blue");
         game.Start(Map, new Random(1));
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
+        var reserveBefore = red.ReinforcementTroops;
+        var troopsBefore = territory.TroopCount;
 
         game.DeployTroops(red.Id, territory, 3);
 
-        Assert.Equal(19, red.ReinforcementTroops);
-        Assert.Equal(4, territory.TroopCount);
+        Assert.Equal(reserveBefore - 3, red.ReinforcementTroops);
+        Assert.Equal(troopsBefore + 3, territory.TroopCount);
     }
 
     [Fact]
@@ -186,7 +195,9 @@ public class GameTests
         game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
         game.EndPhase(red.Id, GamePhase.Deployment, Map, DateTimeOffset.UtcNow);
 
-        Assert.Equal(26, blue.ReinforcementTroops);
+        var blueTerritories = game.Territories.Count(t => t.OwnerId == blue.Id);
+        var expected = Math.Max(3, blueTerritories / 3) + game.BoardOn(Map).ContinentBonusFor(blue.Id);
+        Assert.Equal(expected, blue.ReinforcementTroops);
     }
 
     [Fact]

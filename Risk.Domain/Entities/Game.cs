@@ -282,6 +282,7 @@ public sealed class Game
             throw new BusinessRuleException("It is not this player's turn.");
         if (RequirePlayer(playerId).IsEliminated)
             throw new BusinessRuleException("An eliminated player cannot end a phase.");
+        EnsureNoPendingConquest();
         if (expectedNextPhase != NextPhase())
             throw new BusinessRuleException($"The next phase must be {NextPhase()}.");
         if (expectedNextPhase == GamePhase.Attack && RequirePlayer(playerId).ReinforcementTroops > 0)
@@ -304,13 +305,27 @@ public sealed class Game
         BumpVersion();
     }
 
+    /// <summary>True when the game is running, has a turn time limit and the current turn has used it up.</summary>
+    public bool IsTurnTimedOut(DateTimeOffset now)
+    {
+        var limit = Settings?.TurnTimeLimit ?? 0;
+        return State == GameState.InProgress &&
+               limit > 0 &&
+               TurnStartedAt is not null &&
+               TurnStartedAt.Value.AddSeconds(limit) <= now;
+    }
+
+    /// <summary>
+    /// Ends a timed-out turn. A pending conquest must be completed first
+    /// (<see cref="CompletePendingConquestWithMinimumTroops"/>), so no territory is left with 0 troops.
+    /// </summary>
     public bool AdvanceIfTurnTimedOut(MapGraph map, DateTimeOffset now)
     {
         EnsureState(GameState.InProgress, "A turn can only time out while the game is in progress.");
-        var limit = Settings?.TurnTimeLimit ?? 0;
-        if (limit == 0 || TurnStartedAt is null || TurnStartedAt.Value.AddSeconds(limit) > now)
+        if (!IsTurnTimedOut(now))
             return false;
 
+        EnsureNoPendingConquest();
         AdvanceTurn(map, now);
         return true;
     }
@@ -379,6 +394,7 @@ public sealed class Game
             throw new BusinessRuleException("An eliminated player cannot fortify.");
         if (from.GameId != Id || to.GameId != Id)
             throw new BusinessRuleException("Both territories must belong to this game.");
+        EnsureNoPendingConquest();
         if (troops <= 0)
             throw new BusinessRuleException("At least one troop must be moved.");
 
@@ -391,6 +407,36 @@ public sealed class Game
         from.RemoveTroops(troops);
         to.AddTroops(troops);
         AdvanceTurn(map, now);
+    }
+
+    /// <summary>True while a conquered territory still waits for the attacker to choose how many troops to move in.</summary>
+    public bool HasPendingConquest =>
+        PendingConquestFromTerritoryId is not null || PendingConquestToTerritoryId is not null;
+
+    /// <summary>Blocks every action that must not happen before a pending conquest is completed.</summary>
+    public void EnsureNoPendingConquest()
+    {
+        if (HasPendingConquest)
+            throw new BusinessRuleException("A pending conquest must be completed first.");
+    }
+
+    /// <summary>
+    /// Completes a pending conquest with the minimum of one troop, so a turn never ends with a
+    /// territory holding 0 troops. Returns who attacked and who lost the territory, so the caller
+    /// can apply the rest of the conquest (elimination, cards, victory). Null if nothing was pending.
+    /// </summary>
+    public (Guid AttackerId, Guid DefeatedPlayerId)? CompletePendingConquestWithMinimumTroops()
+    {
+        if (!HasPendingConquest)
+            return null;
+
+        var from = _territories.FirstOrDefault(t => t.Id == PendingConquestFromTerritoryId);
+        var to = _territories.FirstOrDefault(t => t.Id == PendingConquestToTerritoryId);
+        if (CurrentPlayerId is not { } attackerId || from is null || to?.OwnerId is not { } defeatedPlayerId)
+            throw new BusinessRuleException("The pending conquest refers to territories that cannot be found.");
+
+        CompletePendingConquest(attackerId, from, to, 1);
+        return (attackerId, defeatedPlayerId);
     }
 
     public void BeginPendingConquest(Guid playerId, Territory from, Territory to)
@@ -427,6 +473,7 @@ public sealed class Game
             throw new BusinessRuleException("Troops can only be deployed during the Deployment phase.");
         if (CurrentPlayerId != playerId)
             throw new BusinessRuleException("It is not this player's turn.");
+        EnsureNoPendingConquest();
 
         var player = RequirePlayer(playerId);
         if (territory.GameId != Id)
@@ -453,6 +500,48 @@ public sealed class Game
         player.Eliminate();
         BumpVersion();
         return true;
+    }
+
+    /// <summary>The number of bonus cards at which a player must trade before continuing.</summary>
+    public const int ForcedCardTradeThreshold = 5;
+
+    /// <summary>
+    /// A player holding five or more cards must trade down in the Deployment phase before
+    /// placing troops or moving on. Outside Deployment nothing is blocked, so a player can
+    /// never be locked out of the turn by the size of their hand.
+    /// </summary>
+    public void EnsureNoForcedCardTrade(int handSize)
+    {
+        if (CurrentPhase == GamePhase.Deployment && handSize >= ForcedCardTradeThreshold)
+            throw new BusinessRuleException(
+                "Players with five or more cards must trade in cards before continuing.");
+    }
+
+    /// <summary>
+    /// Sends the active player back to Deployment so they can trade in cards they took over
+    /// from an eliminated player. They place the new troops freely and can then attack again.
+    /// </summary>
+    public void ReturnToDeploymentForCardTrade()
+    {
+        EnsureState(GameState.InProgress, "Cards can only be traded while the game is in progress.");
+        if (CurrentPhase != GamePhase.Attack)
+            throw new BusinessRuleException("Only an active Attack phase can return to Deployment.");
+        EnsureNoPendingConquest();
+
+        CurrentPhase = GamePhase.Deployment;
+        BumpVersion();
+    }
+
+    /// <summary>
+    /// Eliminates the player only if they no longer own any territory.
+    /// Returns false when the player is already eliminated or still has territories.
+    /// </summary>
+    public bool EliminateIfDefeated(Guid playerId)
+    {
+        if (_territories.Any(territory => territory.OwnerId == playerId))
+            return false;
+
+        return EliminatePlayer(playerId);
     }
 
     // -------------------------------------------------------------------------

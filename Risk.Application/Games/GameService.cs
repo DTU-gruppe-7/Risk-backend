@@ -11,11 +11,12 @@ namespace Risk.Application.Games;
 public sealed class GameService(
     IGameRepository games,
     IMapRepository map,
-    IBonusCardRepository bonusCards,
-    IMissionCardRepository missionCards,
+    GameDeckSetup deckSetup,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
-    GameAccess access)
+    GameAccess access,
+    ForcedCardTradeGuard forcedCardTrade,
+    FogOfWar fogOfWar)
 {
     public async Task<IReadOnlyList<GameSummaryResponse>> GetAllAsync(GameState? state, CancellationToken ct = default)
     {
@@ -23,8 +24,14 @@ public sealed class GameService(
         return list.Select(GameSummaryResponse.From).ToList();
     }
 
-    public async Task<GameDetailResponse> GetByIdAsync(Guid id, CancellationToken ct = default) =>
-        GameDetailResponse.From(await access.RequireGameAsync(id, ct));
+    public async Task<GameDetailResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var game = await access.RequireGameAsync(id, ct);
+        if (fogOfWar.IsActive(game) && !game.HasParticipant(currentUser.UserId))
+            throw new ForbiddenException("You are not part of this game.");
+
+        return ToResponse(game);
+    }
 
     /// <summary>Creates a new game. The caller becomes host.</summary>
     public async Task<GameDetailResponse> CreateAsync(CreateGameRequest request, CancellationToken ct = default)
@@ -41,7 +48,7 @@ public sealed class GameService(
 
         games.Add(game);
         await unitOfWork.SaveChangesAsync(ct);
-        return GameDetailResponse.From(game);
+        return ToResponse(game);
     }
 
     /// <summary>Starts the game, lays out the board and places blizzards if the mode is on.</summary>
@@ -51,24 +58,10 @@ public sealed class GameService(
         var graph = await map.GetGraphAsync(ct);
         var mapTerritories = await map.GetTerritoriesAsync(ct);
         game.Start(graph, Random.Shared);
-        var existingCards = await bonusCards.GetByGameIdAsync(id, null, ct);
-        if (existingCards.Count == 0)
-        {
-            for (var index = 0; index < mapTerritories.Count; index++)
-            {
-                var territory = mapTerritories[index];
-                bonusCards.Add(new BonusCard(id, CardTypeFor(index), territory.Id));
-            }
-
-            bonusCards.Add(new BonusCard(id, BonusCardType.Wild));
-            bonusCards.Add(new BonusCard(id, BonusCardType.Wild));
-        }
-
-        if (game.Settings?.HasMissions == true)
-            await CreateAndAssignMissionsAsync(game, mapTerritories, ct);
+        await deckSetup.CreateAsync(game, mapTerritories, ct);
 
         await unitOfWork.SaveChangesAsync(ct);
-        return GameDetailResponse.From(game);
+        return ToResponse(game);
     }
 
     public Task<GameDetailResponse> EndAsync(Guid id, CancellationToken ct = default) =>
@@ -79,11 +72,11 @@ public sealed class GameService(
         var game = await access.RequireParticipantWithDetailsAsync(id, ct);
         var graph = await map.GetGraphAsync(ct);
         var player = access.RequireCurrentPlayer(game);
-        await access.EnsureForcedCardTradeCompletedAsync(game, player.Id, ct);
+        await forcedCardTrade.EnsureCompletedAsync(game, player.Id, ct);
 
         game.EndPhase(player.Id, request.Phase, graph, DateTimeOffset.UtcNow);
         await unitOfWork.SaveChangesAsync(ct);
-        return GameDetailResponse.From(game);
+        return ToResponse(game);
     }
 
     public async Task<GameDetailResponse> FortifyAsync(Guid id, FortifyRequest request, CancellationToken ct = default)
@@ -91,7 +84,6 @@ public sealed class GameService(
         var game = await access.RequireParticipantWithDetailsAsync(id, ct);
         var graph = await map.GetGraphAsync(ct);
         var player = access.RequireCurrentPlayer(game);
-        await access.EnsureForcedCardTradeCompletedAsync(game, player.Id, ct);
         var from = game.Territories.FirstOrDefault(t => t.Id == request.FromTerritoryId)
                    ?? throw new NotFoundException("Origin territory", request.FromTerritoryId);
         var to = game.Territories.FirstOrDefault(t => t.Id == request.ToTerritoryId)
@@ -99,7 +91,7 @@ public sealed class GameService(
 
         game.Fortify(player.Id, from, to, request.Troops, graph, DateTimeOffset.UtcNow);
         await unitOfWork.SaveChangesAsync(ct);
-        return GameDetailResponse.From(game);
+        return ToResponse(game);
     }
 
     public async Task<GameSettingResponse> GetSettingsAsync(Guid id, CancellationToken ct = default)
@@ -129,43 +121,12 @@ public sealed class GameService(
     {
         change(game);
         await unitOfWork.SaveChangesAsync(ct);
-        return GameDetailResponse.From(game);
+        return ToResponse(game);
     }
 
-    private static BonusCardType CardTypeFor(int index) =>
-        (index % 3) switch
-        {
-            0 => BonusCardType.Infantry,
-            1 => BonusCardType.Cavalry,
-            _ => BonusCardType.Artillery
-        };
+    private GameDetailResponse ToResponse(Game game) =>
+        fogOfWar.IsActive(game)
+            ? GameDetailResponse.From(game, fogOfWar.ViewerPlayerId(game))
+            : GameDetailResponse.From(game);
 
-    private async Task CreateAndAssignMissionsAsync(
-        Game game, IReadOnlyList<MapTerritory> mapTerritories, CancellationToken ct)
-    {
-        var existingMissions = await missionCards.GetByGameIdAsync(game.Id, null, ct);
-        if (existingMissions.Count > 0)
-            return;
-
-        var continents = mapTerritories
-            .Select(territory => territory.ContinentId)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(id => id, StringComparer.Ordinal)
-            .ToList();
-        var players = game.Players.OrderBy(player => player.TurnOrder).ToList();
-
-        for (var index = 0; index < players.Count; index++)
-        {
-            var player = players[index];
-            var continent = continents[index % continents.Count];
-            var mission = new MissionCard(
-                game.Id,
-                $"Control {continent}",
-                $"Control every territory in {continent}.",
-                MissionObjectiveType.ControlContinent,
-                continent);
-            mission.AssignToPlayer(player.Id);
-            missionCards.Add(mission);
-        }
-    }
 }
