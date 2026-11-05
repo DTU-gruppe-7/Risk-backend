@@ -27,3 +27,6 @@ public sealed record ClaimTerritoryRequest(Guid PlayerId, int InitialTroops = 1)
 /// <summary>Payload to add or remove troops from a territory.</summary>
 /// <param name="Delta">Positive to add troops, negative to remove.</param>
 public sealed record UpdateTroopsRequest(int Delta);
+
+/// <summary>Payload to deploy troops from the current player's reserve.</summary>
+public sealed record DeployTroopsRequest(int Troops);

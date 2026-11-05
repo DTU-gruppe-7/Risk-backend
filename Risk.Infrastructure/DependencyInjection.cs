@@ -1,11 +1,13 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
+using Risk.Application.Interfaces.Services;
 using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
 using Risk.Infrastructure.Repositories;
+using Risk.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using Risk.Application.Auth;
@@ -53,6 +55,8 @@ public static class DependencyInjection
         services.AddScoped<IMapRepository, MapRepository>();
         services.AddScoped<IBonusCardRepository, BonusCardRepository>();
         services.AddScoped<IMissionCardRepository, MissionCardRepository>();
+
+        services.AddSingleton<IDiceRoller, DiceRoller>();
 
         return services;
     }

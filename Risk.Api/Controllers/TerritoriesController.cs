@@ -61,4 +61,15 @@ public sealed class TerritoriesController(TerritoryService territories) : Contro
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<TerritoryResponse>> UpdateTroops(Guid gameId, Guid id, [FromBody] UpdateTroopsRequest request, CancellationToken ct)
         => Ok(await territories.UpdateTroopsAsync(gameId, id, request, ct));
+
+    /// <summary>Deploys troops from the authenticated player's reserve to their territory.</summary>
+    [HttpPut("{id:guid}/deploy")]
+    [ProducesResponseType<TerritoryResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TerritoryResponse>> Deploy(Guid gameId, Guid id,
+        [FromBody] DeployTroopsRequest request, CancellationToken ct)
+        => Ok(await territories.DeployTroopsAsync(gameId, id, request, ct));
 }

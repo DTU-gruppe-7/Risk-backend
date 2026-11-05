@@ -10,25 +10,90 @@ public class GameTests
     private static readonly MapGraph Map = ClassicMap.Graph;
 
     [Fact]
-    public void Start_lays_out_one_unoccupied_territory_per_map_territory()
+    public void Start_distributes_playable_territories_and_one_troop_per_territory()
     {
         var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
 
         game.Start(Map, new Random(1));
 
         Assert.Equal(Map.TerritoryIds, game.Territories.Select(t => t.Identifier));
-        Assert.All(game.Territories, t =>
+        Assert.All(game.Territories.Where(t => !t.IsBlizzard), t =>
         {
             Assert.Equal(game.Id, t.GameId);
-            Assert.False(t.IsBlizzard);
-            Assert.Null(t.OwnerId);
+            Assert.NotNull(t.OwnerId);
+            Assert.Equal(1, t.TroopCount);
         });
+        Assert.Equal(21, game.Territories.Count(t => t.OwnerId == red.Id));
+        Assert.Equal(21, game.Territories.Count(t => t.OwnerId == blue.Id));
+        Assert.Equal(19, red.ReinforcementTroops);
+        Assert.Equal(19, blue.ReinforcementTroops);
+    }
+
+    [Fact]
+    public void Start_does_not_assign_blizzard_territories()
+    {
+        var game = new Game(Host);
+        game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.ConfigureSettings(2, 0, 0, false, false, blizzardCount: 2);
+
+        game.Start(Map, new Random(1));
+
+        Assert.All(game.Territories.Where(t => t.IsBlizzard), t =>
+        {
+            Assert.Null(t.OwnerId);
+            Assert.Equal(0, t.TroopCount);
+        });
+    }
+
+    [Fact]
+    public void DeployTroops_moves_troops_from_reserve_to_owned_territory()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        var territory = game.Territories.First(t => t.OwnerId == red.Id);
+
+        game.DeployTroops(red.Id, territory, 3);
+
+        Assert.Equal(16, red.ReinforcementTroops);
+        Assert.Equal(4, territory.TroopCount);
+    }
+
+    [Fact]
+    public void DeployTroops_rejects_deployment_outside_deployment_phase()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        game.SetPhase(GamePhase.Attack);
+        var territory = game.Territories.First(t => t.OwnerId == red.Id);
+
+        Assert.Throws<BusinessRuleException>(() => game.DeployTroops(red.Id, territory, 1));
+    }
+
+    [Fact]
+    public void DeployTroops_rejects_deployment_outside_current_players_turn()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        var territory = game.Territories.First(t => t.OwnerId == blue.Id);
+
+        Assert.Throws<BusinessRuleException>(() => game.DeployTroops(blue.Id, territory, 1));
     }
 
     [Fact]
     public void Start_places_the_configured_number_of_blizzards()
     {
         var game = new Game(Host);
+        game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
         game.ConfigureSettings(6, 0, 0, false, false, blizzardCount: 5);
 
         game.Start(Map, new Random(1));
@@ -40,6 +105,8 @@ public class GameTests
     public void Start_rejects_more_blizzards_than_the_board_can_take()
     {
         var game = new Game(Host);
+        game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
         game.ConfigureSettings(6, 0, 0, false, false, blizzardCount: 42);
 
         Assert.Throws<BusinessRuleException>(() => game.Start(Map, new Random(1)));
@@ -50,8 +117,11 @@ public class GameTests
     public void Start_requires_a_map()
     {
         var empty = new MapGraph([], [], []);
+        var game = new Game(Host);
+        game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
 
-        Assert.Throws<DomainValidationException>(() => new Game(Host).Start(empty, new Random(1)));
+        Assert.Throws<DomainValidationException>(() => game.Start(empty, new Random(1)));
     }
 
     [Fact]
@@ -116,6 +186,7 @@ public class GameTests
     {
         var game = new Game(Host);
         var player = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
         game.Start(Map, new Random(1));
 
         Assert.Throws<BusinessRuleException>(() => game.AddPlayer(Guid.NewGuid(), "blue"));
@@ -148,6 +219,8 @@ public class GameTests
     public void Start_and_End_follow_the_state_machine()
     {
         var game = new Game(Host);
+        game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
 
         Assert.Throws<BusinessRuleException>(game.End);
         game.Start(Map, new Random(1));
@@ -164,6 +237,7 @@ public class GameTests
     {
         var game = new Game(Host);
         var player = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
 
         Assert.Throws<BusinessRuleException>(() => game.SetPhase(GamePhase.Attack));
         Assert.Throws<BusinessRuleException>(() => game.SetCurrentPlayer(player.Id));
@@ -181,6 +255,7 @@ public class GameTests
     {
         var game = new Game(Host);
         var player = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
         game.Start(Map, new Random(1));
         game.EliminatePlayer(player.Id);
 
@@ -195,10 +270,11 @@ public class GameTests
         var before = game.Version;
 
         var player = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
         game.ReinforcePlayer(player.Id, 3);
         game.Start(Map, new Random(1));
 
-        Assert.Equal(before + 3, game.Version);
+        Assert.Equal(before + 4, game.Version);
     }
 
     [Fact]

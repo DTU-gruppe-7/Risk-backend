@@ -29,6 +29,15 @@ public sealed class GameAccess(IGameRepository games, ICurrentUser currentUser)
         return game;
     }
 
+    public async Task<Game> RequireParticipantWithDetailsAsync(Guid gameId, CancellationToken ct = default)
+    {
+        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
+                   ?? throw new NotFoundException("Game", gameId);
+        if (!game.HasParticipant(currentUser.UserId))
+            throw new ForbiddenException("You are not part of this game.");
+        return game;
+    }
+
     /// <summary>The game, if the current user is its host.</summary>
     public async Task<Game> RequireHostAsync(Guid gameId, CancellationToken ct = default)
     {

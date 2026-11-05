@@ -1,5 +1,8 @@
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Risk.Application.Interfaces.Services;
+using Risk.Application.Services;
 using Risk.Application.Auth;
 using Risk.Application.Cards;
 using Risk.Application.Common;
@@ -18,6 +21,8 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<GameAccess>();
 
+        services.AddScoped<IGameplayService, GameplayService>();
+        services.AddScoped<GameAccess>();
         services.AddScoped<AuthService>();
         services.AddScoped<UserService>();
         services.AddScoped<GameService>();
@@ -26,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<MapService>();
         services.AddScoped<BonusCardService>();
         services.AddScoped<MissionCardService>();
+
 
         return services;
     }

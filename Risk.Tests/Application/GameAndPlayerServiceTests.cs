@@ -40,8 +40,10 @@ public class GameAndPlayerServiceTests
     public async Task Only_the_host_can_start_the_game()
     {
         var game = await CreateGameAsync();
-
+        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
         _currentUser.UserId = Guid.NewGuid();
+        await _playerService.JoinAsync(game.Id, new JoinGameRequest("blue"));
+
         await Assert.ThrowsAsync<ForbiddenException>(() => _gameService.StartAsync(game.Id));
 
         _currentUser.UserId = _host;
@@ -104,6 +106,10 @@ public class GameAndPlayerServiceTests
     public async Task SetCurrentPlayer_rejects_a_player_from_another_game()
     {
         var game = await CreateGameAsync();
+        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
+        _currentUser.UserId = Guid.NewGuid();
+        await _playerService.JoinAsync(game.Id, new JoinGameRequest("blue"));
+        _currentUser.UserId = _host;
         await _gameService.StartAsync(game.Id);
 
         await Assert.ThrowsAsync<ValidationFailedException>(() =>
