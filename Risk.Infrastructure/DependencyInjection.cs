@@ -9,6 +9,8 @@ using Risk.Infrastructure.Persistence;
 using Risk.Infrastructure.Repositories;
 using Risk.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Options;
+using Risk.Application.Auth;
 
 namespace Risk.Infrastructure;
 
@@ -41,9 +43,12 @@ public static class DependencyInjection
         // JWT token generation
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddSingleton(sp =>
+            new AuthTokenSettings(sp.GetRequiredService<IOptions<JwtOptions>>().Value.RefreshTokenLifetime));
 
         // Repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IGameRepository, GameRepository>();
         services.AddScoped<IPlayerRepository, PlayerRepository>();
         services.AddScoped<ITerritoryRepository, TerritoryRepository>();

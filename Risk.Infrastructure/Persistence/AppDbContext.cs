@@ -14,6 +14,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     // Bemærk navnet: IdentityDbContext har allerede en Users-property til
     // ApplicationUser, så domæne-brugerne får deres eget navn.
     public DbSet<User> DomainUsers           => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Game> Games                 => Set<Game>();
     public DbSet<GameSetting> GameSettings   => Set<GameSetting>();
     public DbSet<Player> Players             => Set<Player>();
@@ -51,6 +52,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .WithOne()
             .HasForeignKey<ApplicationUser>(a => a.DomainUserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ------------------------------------------------------------------
+        // RefreshToken (only the SHA-256 hash is stored, never the token)
+        // ------------------------------------------------------------------
+        builder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.TokenHash).HasMaxLength(64).IsFixedLength().IsRequired();
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+            entity.HasIndex(t => t.FamilyId);
+            entity.HasIndex(t => t.UserId);
+
+            entity.HasOne<User>()
+                  .WithMany()
+                  .HasForeignKey(t => t.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
 
         // ------------------------------------------------------------------
         // Game
@@ -263,6 +282,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         // already has a key, so EF would treat it as existing and UPDATE it.
         // ------------------------------------------------------------------
         builder.Entity<User>().Property(e => e.Id).ValueGeneratedNever();
+        builder.Entity<RefreshToken>().Property(e => e.Id).ValueGeneratedNever();
         builder.Entity<Game>().Property(e => e.Id).ValueGeneratedNever();
         builder.Entity<GameSetting>().Property(e => e.Id).ValueGeneratedNever();
         builder.Entity<Player>().Property(e => e.Id).ValueGeneratedNever();

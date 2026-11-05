@@ -18,7 +18,11 @@ Risk-backend/
 * **Game & Player:** Aggregates managing game state, turn phases, and participants.
 * **Map & Board:** Continent, Territory, and TerritoryBorder (borders between adjacent regions).
 * **Cards:** BonusCard and MissionCard.
-* **Authentication:** ASP.NET Core Identity with PostgreSQL storage.
+* **Authentication:** ASP.NET Core Identity with PostgreSQL storage. Login returns a short-lived
+  access token (JWT, 15 min) in the body and sets a refresh token (7 days) as an `HttpOnly`,
+  `SameSite=Strict` cookie scoped to `/api/auth`. `POST /api/auth/refresh` rotates the refresh token;
+  reusing an old one revokes the whole login. `POST /api/auth/logout` revokes it. Only SHA-256 hashes
+  of refresh tokens are stored (`refresh_tokens`). Lifetimes: `Jwt:AccessTokenLifetime` / `Jwt:RefreshTokenLifetime`.
 
 ---
 

@@ -1,5 +1,6 @@
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Risk.Application.Interfaces.Services;
 using Risk.Application.Services;
 using Risk.Application.Auth;
@@ -17,6 +18,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<GameAccess>();
 
         services.AddScoped<IGameplayService, GameplayService>();
         services.AddScoped<GameAccess>();

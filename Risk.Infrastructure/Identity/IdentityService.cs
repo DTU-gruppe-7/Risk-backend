@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 
@@ -35,5 +36,15 @@ public sealed class IdentityService(UserManager<ApplicationUser> userManager) : 
 
         var roles = await userManager.GetRolesAsync(account);
         return new AuthenticatedAccount(account.DomainUserId, roles.ToList());
+    }
+
+    public async Task<IReadOnlyList<string>?> GetRolesAsync(Guid domainUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await userManager.Users.FirstOrDefaultAsync(a => a.DomainUserId == domainUserId, cancellationToken);
+        if (account is null || await userManager.IsLockedOutAsync(account))
+            return null;
+
+        return (await userManager.GetRolesAsync(account)).ToList();
     }
 }
