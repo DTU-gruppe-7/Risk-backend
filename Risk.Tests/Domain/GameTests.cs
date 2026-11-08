@@ -1,6 +1,7 @@
 using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
 using Risk.Domain.Map;
+using Risk.Domain.Services;
 
 namespace Risk.Tests.Domain;
 
@@ -461,5 +462,41 @@ public class GameTests
         Assert.True(game.HasParticipant(Host));
         Assert.True(game.HasParticipant(user));
         Assert.False(game.HasParticipant(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void Battle_losses_reduce_troops_and_bump_the_version_even_without_a_conquest()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        var from = game.Territories.First(t => t.OwnerId == red.Id);
+        var to = game.Territories.First(t => t.OwnerId != red.Id && !t.IsBlizzard);
+        from.AddTroops(5);
+        to.AddTroops(5);
+        var (fromTroops, toTroops, version) = (from.TroopCount, to.TroopCount, game.Version);
+
+        game.ApplyBattleLosses(from, to, new BattleResult(1, 1, [6, 1], [6, 1]));
+
+        Assert.Equal(fromTroops - 1, from.TroopCount);
+        Assert.Equal(toTroops - 1, to.TroopCount);
+        Assert.True(game.Version > version);
+    }
+
+    [Fact]
+    public void Battle_losses_are_rejected_for_territories_of_another_game()
+    {
+        var game = new Game(Host);
+        game.AddPlayer(Guid.NewGuid(), "red");
+        game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(Map, new Random(1));
+        var other = new Game(Host);
+        other.AddPlayer(Guid.NewGuid(), "red");
+        other.AddPlayer(Guid.NewGuid(), "blue");
+        other.Start(Map, new Random(1));
+
+        Assert.Throws<BusinessRuleException>(() => game.ApplyBattleLosses(
+            game.Territories.First(), other.Territories.First(), new BattleResult(1, 0, [1], [6])));
     }
 }

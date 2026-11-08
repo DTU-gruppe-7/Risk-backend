@@ -29,8 +29,17 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
         var viewer = ViewerPlayerId(game)
                      ?? throw new ForbiddenException("You are not a player in this game.");
         var graph = await mapRepository.GetGraphAsync(cancellationToken);
-        return game.BoardOn(graph).VisibleTo(viewer);
+        return VisibleTerritoriesFor(game, graph, viewer);
     }
+
+    /// <summary>
+    /// The territories a given player can see, or null when the game has no fog of war.
+    /// Takes the viewer explicitly, for callers without a current user (realtime pushes).
+    /// </summary>
+    public static IReadOnlySet<string>? VisibleTerritoriesFor(Game game, MapGraph graph, Guid viewerPlayerId) =>
+        game.Settings?.HasFogOfWar == true
+            ? game.BoardOn(graph).VisibleTo(viewerPlayerId)
+            : null;
 
     /// <summary>Rejects a target the player cannot see, so fog cannot be probed by attacking.</summary>
     public void EnsureTargetVisible(Game game, MapGraph graph, Guid playerId, Territory target)

@@ -8,6 +8,7 @@ using Scalar.AspNetCore;
 using Risk.Api.Auth;
 using Risk.Api.BackgroundServices;
 using Risk.Api.ErrorHandling;
+using Risk.Api.Realtime;
 using Risk.Application;
 using Risk.Application.Interfaces;
 using Risk.Infrastructure;
@@ -65,6 +66,7 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddOpenApi();
+builder.Services.AddRealtime();
 builder.Services.AddApplication();
 // Build tools (OpenAPI generation, dotnet ef) construct the host without running it, and must not start timers.
 if (!isDesignTime)
@@ -117,7 +119,11 @@ else
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options => options.TokenValidationParameters = jwt.CreateValidationParameters());
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = jwt.CreateValidationParameters();
+        options.Events = RealtimeEndpoints.ReadTokenFromQueryOnHubs();
+    });
 
 builder.Services.AddAuthorization();
 
@@ -139,5 +145,9 @@ app.UseAuthorization();
 app.MapHealthChecks("/healthz", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapControllers();
+app.MapRealtimeHubs();
 
 app.Run();
+
+// Lets the integration tests start the API with WebApplicationFactory<Program>.
+public partial class Program;
