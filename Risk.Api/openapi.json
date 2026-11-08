@@ -3947,6 +3947,7 @@
         "required": [
           "id",
           "userId",
+          "userName",
           "color",
           "turnOrder",
           "reinforcementTroops",
@@ -3961,6 +3962,9 @@
           "userId": {
             "type": "string",
             "format": "uuid"
+          },
+          "userName": {
+            "type": "string"
           },
           "color": {
             "type": "string"

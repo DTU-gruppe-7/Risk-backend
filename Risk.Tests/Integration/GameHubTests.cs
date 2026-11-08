@@ -35,7 +35,12 @@ public sealed class GameHubTests(ApiFixture api)
             var started = await NextAsync(updates, u => u.Game("state") == "InProgress");
             Assert.True(started.Version > joined.Version);
             Assert.Equal(42, started.Territories.GetArrayLength());
+            Assert.Equal(red.UserName, UserNameOf(started.Players, red.Id));
+            Assert.Equal(blue.UserName, UserNameOf(started.Players, blue.Id));
         }
+
+        var rest = await blue.Http.GetFromJsonAsync<JsonElement>($"/api/games/{gameId}");
+        Assert.Equal(red.UserName, UserNameOf(rest.GetProperty("players"), red.Id));
     }
 
     [Fact]
@@ -55,9 +60,23 @@ public sealed class GameHubTests(ApiFixture api)
         // Exactly what the REST endpoint returns for the same player.
         var rest = await red.Http.GetFromJsonAsync<JsonElement>($"/api/games/{gameId}/territories");
         Assert.Equal(Identifiers(rest), Identifiers(started.Territories));
-        Assert.True(started.Territories.GetArrayLength() < 42);
 
+        // Fog of war: exactly red's own territories and their neighbours. (Not "fewer than 42":
+        // with two players those neighbours can cover the whole board.)
         var redPlayerId = PlayerIdOf(started, red.Id);
+        var map = await red.Http.GetFromJsonAsync<JsonElement>("/api/map");
+        var neighbours = map.GetProperty("territories").EnumerateArray().ToDictionary(
+            t => t.GetProperty("id").GetString()!,
+            t => t.GetProperty("neighborIds").EnumerateArray().Select(n => n.GetString()!).ToList());
+        var owned = started.Territories.EnumerateArray()
+            .Where(t => t.GetProperty("ownerId").GetString() == redPlayerId)
+            .Select(t => t.GetProperty("identifier").GetString()!)
+            .ToList();
+        Assert.NotEmpty(owned);
+        Assert.Equal(
+            owned.Concat(owned.SelectMany(id => neighbours[id])).Distinct().Order().ToList(),
+            Identifiers(started.Territories));
+
         Assert.All(started.Players.EnumerateArray().Where(p => p.GetProperty("id").GetString() != redPlayerId),
             p => Assert.Equal(0, p.GetProperty("reinforcementTroops").GetInt32()));
     }
@@ -121,6 +140,11 @@ public sealed class GameHubTests(ApiFixture api)
         update.Players.EnumerateArray()
             .Single(p => p.GetProperty("userId").GetGuid() == userId)
             .GetProperty("id").GetString()!;
+
+    private static string? UserNameOf(JsonElement players, Guid userId) =>
+        players.EnumerateArray()
+            .Single(p => p.GetProperty("userId").GetGuid() == userId)
+            .GetProperty("userName").GetString();
 
     private static List<string> Identifiers(JsonElement territories) =>
         territories.EnumerateArray().Select(t => t.GetProperty("identifier").GetString()!).Order().ToList();
