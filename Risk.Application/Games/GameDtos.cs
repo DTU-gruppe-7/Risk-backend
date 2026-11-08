@@ -76,15 +76,20 @@ public sealed record GameSettingResponse(
 }
 
 /// <summary>Lightweight player summary embedded in game responses.</summary>
+/// <param name="UserName">The player's public in-game name. Requires <see cref="Player.User"/> to be loaded.</param>
 public sealed record PlayerSummaryResponse(
-    Guid Id, Guid UserId, string Color, int TurnOrder, int ReinforcementTroops, bool IsEliminated)
+    Guid Id, Guid UserId, string UserName, string Color, int TurnOrder, int ReinforcementTroops, bool IsEliminated)
 {
     internal static PlayerSummaryResponse From(Player p) =>
-        new(p.Id, p.UserId, p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated);
+        new(p.Id, p.UserId, UserNameOf(p), p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated);
 
     internal static PlayerSummaryResponse From(Player p, Guid? viewerPlayerId) =>
-        new(p.Id, p.UserId, p.Color, p.TurnOrder,
+        new(p.Id, p.UserId, UserNameOf(p), p.Color, p.TurnOrder,
             viewerPlayerId == p.Id ? p.ReinforcementTroops : 0, p.IsEliminated);
+
+    // Every repository query that builds game responses includes the user. The fallback only
+    // matters for in-memory games in tests, which have no users.
+    private static string UserNameOf(Player p) => p.User?.Username ?? string.Empty;
 }
 
 /// <summary>Payload to create a new game. All fields are optional; defaults apply.</summary>
