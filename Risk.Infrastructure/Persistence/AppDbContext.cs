@@ -84,6 +84,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
             entity.Property(g => g.State).HasConversion<string>().HasMaxLength(30).IsRequired();
             entity.Property(g => g.CurrentPhase).HasConversion<string>().HasMaxLength(30).IsRequired();
+            entity.Property(g => g.TurnStartedAt);
+            entity.Property(g => g.HasConqueredTerritoryThisTurn).IsRequired();
+            entity.Property(g => g.PendingConquestFromTerritoryId);
+            entity.Property(g => g.PendingConquestToTerritoryId);
+            entity.Property(g => g.WinnerId);
+            entity.Property(g => g.BonusCardTradeCount).IsRequired();
 
             // Explicit FK from HostId → User
             entity.HasOne<User>()
@@ -120,6 +126,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("game_settings");
             entity.HasKey(s => s.Id);
+            entity.Property(s => s.VictoryMode)
+                  .HasConversion<string>()
+                  .HasMaxLength(30)
+                  .IsRequired();
         });
 
         // ------------------------------------------------------------------
@@ -269,6 +279,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(m => m.Id);
             entity.Property(m => m.Title).HasMaxLength(200).IsRequired();
             entity.Property(m => m.Description).HasMaxLength(1000).IsRequired();
+            entity.Property(m => m.ObjectiveType).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(m => m.TargetIdentifier).HasMaxLength(100);
+            entity.Property(m => m.TargetPlayerId);
 
             entity.HasOne(m => m.Game)
                   .WithMany()

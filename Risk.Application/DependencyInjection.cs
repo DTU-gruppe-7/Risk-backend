@@ -23,6 +23,10 @@ public static class DependencyInjection
 
         services.AddScoped<IGameplayService, GameplayService>();
         services.AddScoped<GameAccess>();
+        services.AddScoped<ForcedCardTradeGuard>();
+        services.AddScoped<ConquestResolver>();
+        services.AddScoped<GameDeckSetup>();
+        services.AddScoped<FogOfWar>();
         services.AddScoped<AuthService>();
         services.AddScoped<UserService>();
         services.AddScoped<GameService>();
@@ -31,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<MapService>();
         services.AddScoped<BonusCardService>();
         services.AddScoped<MissionCardService>();
+        services.AddScoped<TurnTimeoutService>();
 
 
         return services;

@@ -19,8 +19,24 @@ public class GameAndPlayerServiceTests
     {
         _currentUser = new FakeCurrentUser(_host);
         var access = new GameAccess(_games, _currentUser);
-        _gameService = new GameService(_games, new FakeMapRepository(), _unitOfWork, _currentUser, access);
-        _playerService = new PlayerService(new FakePlayerRepository(_games), _unitOfWork, _currentUser, access);
+        var fogOfWar = new FogOfWar(_currentUser, new FakeMapRepository());
+        _gameService = new GameService(
+            _games,
+            new FakeMapRepository(),
+            new GameDeckSetup(new FakeBonusCardRepository(), new FakeMissionCardRepository()),
+            _unitOfWork,
+            _currentUser,
+            access,
+            new ForcedCardTradeGuard(new FakeBonusCardRepository()),
+            fogOfWar);
+        _playerService = new PlayerService(
+            new FakePlayerRepository(_games),
+            new FakeBonusCardRepository(),
+            new FakeMissionCardRepository(),
+            _unitOfWork,
+            _currentUser,
+            access,
+            fogOfWar);
     }
 
     private async Task<GameDetailResponse> CreateGameAsync() =>
@@ -40,7 +56,7 @@ public class GameAndPlayerServiceTests
     public async Task Only_the_host_can_start_the_game()
     {
         var game = await CreateGameAsync();
-        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
+        var player = await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
         _currentUser.UserId = Guid.NewGuid();
         await _playerService.JoinAsync(game.Id, new JoinGameRequest("blue"));
 
@@ -76,14 +92,12 @@ public class GameAndPlayerServiceTests
     {
         var game = await CreateGameAsync();
         _currentUser.UserId = Guid.NewGuid();
-        var player = await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
+        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
 
         _currentUser.UserId = Guid.NewGuid();
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
-            _playerService.ReinforceAsync(game.Id, player.Id, new ReinforceRequest(3)));
-        await Assert.ThrowsAsync<ForbiddenException>(() =>
-            _gameService.SetPhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Attack)));
+            _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Attack)));
     }
 
     [Fact]
@@ -102,17 +116,4 @@ public class GameAndPlayerServiceTests
         Assert.Empty(_games.Games.Single().Players);
     }
 
-    [Fact]
-    public async Task SetCurrentPlayer_rejects_a_player_from_another_game()
-    {
-        var game = await CreateGameAsync();
-        await _playerService.JoinAsync(game.Id, new JoinGameRequest("red"));
-        _currentUser.UserId = Guid.NewGuid();
-        await _playerService.JoinAsync(game.Id, new JoinGameRequest("blue"));
-        _currentUser.UserId = _host;
-        await _gameService.StartAsync(game.Id);
-
-        await Assert.ThrowsAsync<ValidationFailedException>(() =>
-            _gameService.SetCurrentPlayerAsync(game.Id, new SetCurrentPlayerRequest(Guid.NewGuid())));
-    }
 }

@@ -21,6 +21,10 @@ public sealed record BonusCardResponse(
 /// <param name="PlayerId">Player receiving the card.</param>
 public sealed record AssignCardRequest(Guid PlayerId);
 
+public sealed record TradeCardsRequest(IReadOnlyList<Guid> CardIds);
+
+public sealed record TradeCardsResponse(int TroopsAwarded);
+
 /// <summary>A mission card.</summary>
 /// <param name="Id">Card ID.</param>
 /// <param name="GameId">Owning game.</param>
@@ -30,10 +34,12 @@ public sealed record AssignCardRequest(Guid PlayerId);
 /// <param name="IsCompleted">Whether the mission has been completed.</param>
 public sealed record MissionCardResponse(
     Guid Id, Guid GameId, Guid? PlayerId,
-    string Title, string Description, bool IsCompleted)
+    string Title, string Description, bool IsCompleted,
+    MissionObjectiveType ObjectiveType, string? TargetIdentifier, Guid? TargetPlayerId)
 {
     internal static MissionCardResponse From(MissionCard m) =>
-        new(m.Id, m.GameId, m.PlayerId, m.Title, m.Description, m.IsCompleted);
+        new(m.Id, m.GameId, m.PlayerId, m.Title, m.Description, m.IsCompleted,
+            m.ObjectiveType, m.TargetIdentifier, m.TargetPlayerId);
 }
 
 /// <summary>Payload to assign a mission card to a player.</summary>

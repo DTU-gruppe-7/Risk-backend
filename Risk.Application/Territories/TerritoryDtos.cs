@@ -19,14 +19,5 @@ public sealed record TerritoryResponse(
         new(t.Id, t.Identifier, t.OwnerId, t.TroopCount, t.IsBlizzard);
 }
 
-/// <summary>Payload to claim a territory for a player.</summary>
-/// <param name="PlayerId">Player claiming the territory.</param>
-/// <param name="InitialTroops">Troops to place on claim (minimum 1).</param>
-public sealed record ClaimTerritoryRequest(Guid PlayerId, int InitialTroops = 1);
-
-/// <summary>Payload to add or remove troops from a territory.</summary>
-/// <param name="Delta">Positive to add troops, negative to remove.</param>
-public sealed record UpdateTroopsRequest(int Delta);
-
 /// <summary>Payload to deploy troops from the current player's reserve.</summary>
 public sealed record DeployTroopsRequest(int Troops);

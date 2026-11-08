@@ -1,5 +1,6 @@
 using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
+using Risk.Domain.Map;
 
 namespace Risk.Tests.Domain;
 
@@ -95,14 +96,24 @@ public class CardTests
     [Fact]
     public void Mission_must_be_assigned_before_it_can_be_completed()
     {
-        var mission = new MissionCard(Guid.NewGuid(), "Conquer Asia", "Hold every territory in Asia.");
+        var game = new Game(Guid.NewGuid());
+        var player = game.AddPlayer(Guid.NewGuid(), "red");
+        var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.Start(ClassicMap.Graph, new Random(1));
+        var mission = new MissionCard(
+            game.Id, "Conquer the world", "Hold every territory.",
+            MissionObjectiveType.ControlAllTerritories);
 
-        Assert.Throws<BusinessRuleException>(mission.Complete);
+        Assert.Throws<BusinessRuleException>(() =>
+            mission.Complete(game, ClassicMap.Graph));
 
-        mission.AssignToPlayer(Guid.NewGuid());
-        mission.Complete();
+        mission.AssignToPlayer(player.Id);
+        foreach (var territory in game.Territories.Where(t => t.OwnerId == opponent.Id).ToList())
+            territory.TransferOwnership(player.Id, 1);
 
+        mission.Complete(game, ClassicMap.Graph);
         Assert.True(mission.IsCompleted);
-        Assert.Throws<BusinessRuleException>(mission.Complete);
+        Assert.Throws<BusinessRuleException>(() =>
+            mission.Complete(game, ClassicMap.Graph));
     }
 }

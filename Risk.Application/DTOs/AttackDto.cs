@@ -5,7 +5,9 @@ public record AttackDto(
     Guid PlayerId,
     Guid FromTerritoryId,
     Guid ToTerritoryId,
-    int AttackingTroopsCount
+    int AttackingTroopsCount,
+    int DefendingTroopsCount = 2,
+    int? MovingTroopsCount = null
 );
 
 public record AttackResultDto(
@@ -13,5 +15,7 @@ public record AttackResultDto(
     int DefenderLosses,
     IReadOnlyList<int> AttackerDice,
     IReadOnlyList<int> DefenderDice,
-    bool TerritoryConquered
+    bool TerritoryConquered,
+    int TroopsMoved = 0,
+    bool BonusCardAwarded = false
 );

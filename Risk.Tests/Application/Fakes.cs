@@ -48,6 +48,9 @@ internal sealed class FakeGameRepository : IGameRepository
     public Task<IReadOnlyList<Game>> GetGamesByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Game>>(Games.Where(g => g.HasParticipant(userId)).ToList());
 
+    public Task<IReadOnlyList<Game>> GetInProgressGamesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Game>>(Games.Where(g => g.State == GameState.InProgress).ToList());
+
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Games.Any(g => g.Id == id));
 
@@ -79,4 +82,54 @@ internal sealed class FakePlayerRepository(FakeGameRepository games) : IPlayerRe
 
     public Task<Player?> GetByGameAndUserIdAsync(Guid gameId, Guid userId, CancellationToken cancellationToken = default) =>
         Task.FromResult(All.FirstOrDefault(p => p.GameId == gameId && p.UserId == userId));
+}
+
+internal sealed class FakeBonusCardRepository : IBonusCardRepository
+{
+    private readonly List<BonusCard> _cards = [];
+
+    public Task<BonusCard?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_cards.FirstOrDefault(card => card.Id == id));
+
+    public Task<BonusCard?> GetAsync(Guid gameId, Guid cardId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_cards.FirstOrDefault(card => card.GameId == gameId && card.Id == cardId));
+
+    public Task<BonusCard?> GetNextUnassignedAsync(Guid gameId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_cards.FirstOrDefault(card => card.GameId == gameId && card.PlayerId is null && !card.Used));
+
+    public Task<IReadOnlyList<BonusCard>> GetByPlayerIdAsync(
+        Guid gameId, Guid playerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<BonusCard>>(
+            _cards.Where(card => card.GameId == gameId && card.PlayerId == playerId && !card.Used).ToList());
+
+    public Task<IReadOnlyList<BonusCard>> GetByGameIdAsync(
+        Guid gameId, Guid? playerId = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<BonusCard>>(
+            _cards.Where(card => card.GameId == gameId && (playerId is null || card.PlayerId == playerId)).ToList());
+
+    public void Add(BonusCard entity) => _cards.Add(entity);
+    public void Remove(BonusCard entity) => _cards.Remove(entity);
+}
+
+internal sealed class FakeMissionCardRepository : IMissionCardRepository
+{
+    private readonly List<MissionCard> _cards = [];
+
+    public Task<MissionCard?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_cards.FirstOrDefault(card => card.Id == id));
+
+    public Task<MissionCard?> GetAsync(Guid gameId, Guid cardId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_cards.FirstOrDefault(card => card.GameId == gameId && card.Id == cardId));
+
+    public Task<MissionCard?> GetByPlayerIdAsync(
+        Guid gameId, Guid playerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_cards.FirstOrDefault(card => card.GameId == gameId && card.PlayerId == playerId));
+
+    public Task<IReadOnlyList<MissionCard>> GetByGameIdAsync(
+        Guid gameId, Guid? playerId = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MissionCard>>(
+            _cards.Where(card => card.GameId == gameId && (playerId is null || card.PlayerId == playerId)).ToList());
+
+    public void Add(MissionCard entity) => _cards.Add(entity);
+    public void Remove(MissionCard entity) => _cards.Remove(entity);
 }

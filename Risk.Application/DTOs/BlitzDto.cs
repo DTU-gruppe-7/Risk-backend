@@ -4,8 +4,11 @@ public record BlitzAttackDto(
     Guid GameId,
     Guid PlayerId,
     Guid FromTerritoryId,
-    Guid ToTerritoryId
+    Guid ToTerritoryId,
+    int? MovingTroopsCount = null
 );
+
+public record CompleteConquestDto(Guid GameId, Guid FromTerritoryId, Guid ToTerritoryId, int MovingTroopsCount);
 
 public record BlitzRoundDto(
     IReadOnlyList<int> AttackerDice,
@@ -20,5 +23,7 @@ public record BlitzResultDto(
     bool TerritoryConquered,
     int RemainingAttackingTerritoryTroops,
     int RemainingDefendingTerritoryTroops,
-    IReadOnlyList<BlitzRoundDto> Rounds
+    IReadOnlyList<BlitzRoundDto> Rounds,
+    int TroopsMoved = 0,
+    bool BonusCardAwarded = false
 );

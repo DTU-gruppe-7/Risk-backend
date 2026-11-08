@@ -2,6 +2,7 @@ using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Domain.Entities;
+using Risk.Domain.Exceptions;
 
 namespace Risk.Application.Common;
 
@@ -9,7 +10,9 @@ namespace Risk.Application.Common;
 /// Loads a game and checks what the current user may do with it.
 /// Every use case asks here, so the access rules exist in one place.
 /// </summary>
-public sealed class GameAccess(IGameRepository games, ICurrentUser currentUser)
+public sealed class GameAccess(
+    IGameRepository games,
+    ICurrentUser currentUser)
 {
     public async Task<Game> RequireGameAsync(Guid gameId, CancellationToken ct = default) =>
         await games.GetAsync(gameId, ct) ?? throw new NotFoundException("Game", gameId);
@@ -38,10 +41,23 @@ public sealed class GameAccess(IGameRepository games, ICurrentUser currentUser)
         return game;
     }
 
+    public Player RequireCurrentPlayer(Game game) =>
+        game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)
+        ?? throw new ForbiddenException("You are not a player in this game.");
+
     /// <summary>The game, if the current user is its host.</summary>
     public async Task<Game> RequireHostAsync(Guid gameId, CancellationToken ct = default)
     {
         var game = await RequireGameAsync(gameId, ct);
+        if (!game.IsHost(currentUser.UserId))
+            throw new ForbiddenException("Only the host can do this.");
+        return game;
+    }
+
+    public async Task<Game> RequireHostWithDetailsAsync(Guid gameId, CancellationToken ct = default)
+    {
+        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
+                   ?? throw new NotFoundException("Game", gameId);
         if (!game.IsHost(currentUser.UserId))
             throw new ForbiddenException("Only the host can do this.");
         return game;

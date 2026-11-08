@@ -59,6 +59,17 @@ public sealed class BonusCard
         Used = true;
         PlayerId = null;
     }
+
+    public bool Matches(BonusCard other) =>
+        Type == other.Type && Type != BonusCardType.Wild;
+
+    public void ReturnToDeck()
+    {
+        if (Used)
+            return;
+
+        PlayerId = null;
+    }
 }
 
 public enum BonusCardType

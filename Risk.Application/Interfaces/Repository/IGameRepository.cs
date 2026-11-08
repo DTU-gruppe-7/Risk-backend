@@ -10,5 +10,6 @@ public interface IGameRepository : IRepository<Game>
     Task<Game?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Game>> ListAsync(GameState? state, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Game>> GetGamesByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Game>> GetInProgressGamesAsync(CancellationToken cancellationToken = default);
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
 }
