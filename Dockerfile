@@ -31,7 +31,7 @@ RUN dotnet ef migrations bundle \
       --output /app/efbundle
 
 # ---------- Migrator (engangs-container) ----------
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:56b6c354a140e50e09d45a397b43f9f9d31012c325020239e602e06d1594f8ff AS migrator
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:bf8715422b59a65719605d4fe2b8f3f0eb96209b84cb2ed6bf3b5af7d879f148 AS migrator
 WORKDIR /app
 # Single-file bundles udpakker til $HOME som standard. /tmp er den eneste
 # skrivbare sti, når containeren kører read-only.
