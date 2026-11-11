@@ -1,6 +1,7 @@
 using Risk.Domain.Common;
 using Risk.Domain.Exceptions;
 using Risk.Domain.Map;
+using Risk.Domain.Services;
 
 namespace Risk.Domain.Entities;
 
@@ -463,6 +464,23 @@ public sealed class Game
         to.TransferOwnership(playerId, troops);
         PendingConquestFromTerritoryId = null;
         PendingConquestToTerritoryId = null;
+        BumpVersion();
+    }
+
+    /// <summary>
+    /// Removes the troops lost in one battle round. Goes through the aggregate so the
+    /// version increases even when nothing is conquered, and clients see the new troop counts.
+    /// </summary>
+    public void ApplyBattleLosses(Territory from, Territory to, BattleResult battle)
+    {
+        EnsureState(GameState.InProgress, "Battles can only happen while the game is in progress.");
+        if (from.GameId != Id || to.GameId != Id)
+            throw new BusinessRuleException("The territory is not part of this game.");
+
+        if (battle.AttackerLosses > 0)
+            from.RemoveTroops(battle.AttackerLosses);
+        if (battle.DefenderLosses > 0)
+            to.RemoveTroops(battle.DefenderLosses);
         BumpVersion();
     }
 

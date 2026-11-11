@@ -52,7 +52,7 @@ public sealed class GameplayService(
         var defenderDice = diceRoller.Roll(dto.DefendingTroopsCount);
         var battle = BattleService.Fight(attackerDice, defenderDice);
 
-        ApplyBattleLosses(context.From, context.To, battle);
+        context.Game.ApplyBattleLosses(context.From, context.To, battle);
 
         var conquered = context.To.TroopCount == 0;
         var troopsMoved = 0;
@@ -104,7 +104,7 @@ public sealed class GameplayService(
             var defenderDice = diceRoller.Roll(Math.Min(2, context.To.TroopCount));
             var battle = BattleService.Fight(attackerDice, defenderDice);
 
-            ApplyBattleLosses(context.From, context.To, battle);
+            context.Game.ApplyBattleLosses(context.From, context.To, battle);
             totalAttackerLosses += battle.AttackerLosses;
             totalDefenderLosses += battle.DefenderLosses;
             rounds.Add(new BlitzRoundDto(
@@ -200,15 +200,6 @@ public sealed class GameplayService(
                 "The attack is not allowed from the selected territories.");
 
         return new AttackContext(game, from, to, player.Id);
-    }
-
-    private static void ApplyBattleLosses(
-        Territory from, Territory to, BattleResult battle)
-    {
-        if (battle.AttackerLosses > 0)
-            from.RemoveTroops(battle.AttackerLosses);
-        if (battle.DefenderLosses > 0)
-            to.RemoveTroops(battle.DefenderLosses);
     }
 
     private static Territory FindTerritory(
