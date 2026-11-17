@@ -1,5 +1,7 @@
 using Risk.Application.Interfaces;
+using Risk.Application.Games;
 using Risk.Application.Interfaces.Repository;
+using Risk.Application.Interfaces.Services;
 using Risk.Domain.Entities;
 using Risk.Domain.Map;
 
@@ -132,4 +134,22 @@ internal sealed class FakeMissionCardRepository : IMissionCardRepository
 
     public void Add(MissionCard entity) => _cards.Add(entity);
     public void Remove(MissionCard entity) => _cards.Remove(entity);
+}
+
+internal sealed class FakeGameRealtime : IGameRealtime
+{
+    public List<(Guid GameId, GameUpdateMessage Update)> ToGame { get; } = [];
+    public List<(Guid GameId, Guid UserId, GameUpdateMessage Update)> ToUser { get; } = [];
+
+    public Task SendToGameAsync(Guid gameId, GameUpdateMessage update)
+    {
+        ToGame.Add((gameId, update));
+        return Task.CompletedTask;
+    }
+
+    public Task SendToUserInGameAsync(Guid gameId, Guid userId, GameUpdateMessage update)
+    {
+        ToUser.Add((gameId, userId, update));
+        return Task.CompletedTask;
+    }
 }

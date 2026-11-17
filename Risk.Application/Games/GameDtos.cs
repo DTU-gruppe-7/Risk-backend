@@ -1,3 +1,4 @@
+using Risk.Application.Territories;
 using Risk.Domain.Entities;
 
 namespace Risk.Application.Games;
@@ -53,6 +54,14 @@ public sealed record GameDetailResponse(
                 .ToList(),
             g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
 }
+
+/// <summary>
+/// Pushed to clients over the game hub after every change: the same shapes as
+/// <c>GET /api/games/{id}</c> and <c>GET /api/games/{id}/territories</c>, filtered for the receiver.
+/// </summary>
+/// <param name="Game">The game as the receiver may see it.</param>
+/// <param name="Territories">The territories the receiver may see, ordered by identifier.</param>
+public sealed record GameUpdateMessage(GameDetailResponse Game, IReadOnlyList<TerritoryResponse> Territories);
 
 /// <summary>Game configuration snapshot.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>

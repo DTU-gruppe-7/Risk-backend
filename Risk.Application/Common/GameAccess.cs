@@ -24,10 +24,17 @@ public sealed class GameAccess(
     }
 
     /// <summary>The game, if the current user is its host or one of its players.</summary>
-    public async Task<Game> RequireParticipantAsync(Guid gameId, CancellationToken ct = default)
+    public Task<Game> RequireParticipantAsync(Guid gameId, CancellationToken ct = default) =>
+        RequireParticipantAsync(gameId, currentUser.UserId, ct);
+
+    /// <summary>
+    /// The game, if the given user is its host or one of its players.
+    /// For callers that know the user without an HTTP request, such as realtime hubs.
+    /// </summary>
+    public async Task<Game> RequireParticipantAsync(Guid gameId, Guid userId, CancellationToken ct = default)
     {
         var game = await RequireGameAsync(gameId, ct);
-        if (!game.HasParticipant(currentUser.UserId))
+        if (!game.HasParticipant(userId))
             throw new ForbiddenException("You are not part of this game.");
         return game;
     }
