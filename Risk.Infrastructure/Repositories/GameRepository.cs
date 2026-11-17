@@ -7,8 +7,9 @@ namespace Risk.Infrastructure.Repositories;
 
 public class GameRepository(AppDbContext context) : Repository<Game>(context), IGameRepository
 {
+    // Players include their user, so game responses can show player names.
     private IQueryable<Game> WithSettingsAndPlayers =>
-        _dbSet.Include(g => g.Settings).Include(g => g.Players);
+        _dbSet.Include(g => g.Settings).Include(g => g.Players).ThenInclude(p => p.User);
 
     public override Task<Game?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         GetAsync(id, cancellationToken);

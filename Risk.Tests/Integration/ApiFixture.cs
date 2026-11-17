@@ -49,15 +49,16 @@ public sealed class ApiFixture : IAsyncLifetime
     {
         var client = _factory.CreateClient();
         var unique = $"{name}-{Guid.NewGuid():N}";
+        var userName = unique[..Math.Min(unique.Length, 30)];
         var response = await client.PostAsJsonAsync("/api/auth/register",
-            new { userName = unique[..Math.Min(unique.Length, 30)], email = $"{unique}@example.com", password = "Correct-Horse-Battery-9" });
+            new { userName, email = $"{unique}@example.com", password = "Correct-Horse-Battery-9" });
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"Register failed: {await response.Content.ReadAsStringAsync()}");
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var token = body.GetProperty("accessToken").GetString()!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return new TestUser(body.GetProperty("user").GetProperty("id").GetGuid(), token, client);
+        return new TestUser(body.GetProperty("user").GetProperty("id").GetGuid(), userName, token, client);
     }
 
     /// <summary>
@@ -84,7 +85,7 @@ public sealed class ApiFixture : IAsyncLifetime
     }
 }
 
-public sealed record TestUser(Guid Id, string Token, HttpClient Http);
+public sealed record TestUser(Guid Id, string UserName, string Token, HttpClient Http);
 
 [CollectionDefinition(Name)]
 public sealed class ApiCollection : ICollectionFixture<ApiFixture>
