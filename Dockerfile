@@ -4,7 +4,7 @@
 # og så Dependabot kan finde og opdatere dem.
 
 # ---------- Build: restore + publish ----------
-FROM mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS build
 WORKDIR /src
 
 # Kun projektfiler først, så restore-laget caches, indtil afhængighederne ændres
@@ -31,7 +31,7 @@ RUN dotnet ef migrations bundle \
       --output /app/efbundle
 
 # ---------- Migrator (engangs-container) ----------
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:56b6c354a140e50e09d45a397b43f9f9d31012c325020239e602e06d1594f8ff AS migrator
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:bf8715422b59a65719605d4fe2b8f3f0eb96209b84cb2ed6bf3b5af7d879f148 AS migrator
 WORKDIR /app
 # Single-file bundles udpakker til $HOME som standard. /tmp er den eneste
 # skrivbare sti, når containeren kører read-only.
@@ -41,7 +41,7 @@ USER $APP_UID
 ENTRYPOINT ["./efbundle"]
 
 # ---------- API (standard-target, skal stå sidst) ----------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:a9298ccc39c6258ae71228479e2f3f8d2ceb6639a9927262a4b0ff7d319a0e7e AS api
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:cae5b962bfb786606def03d250c6a645cc98839095c89e806e4bd8978a68115b AS api
 WORKDIR /app
 COPY --from=build /app/publish .
 USER $APP_UID
