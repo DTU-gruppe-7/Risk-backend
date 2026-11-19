@@ -2,6 +2,7 @@ using Risk.Application.Common;
 using Risk.Application.Exceptions;
 using Risk.Application.Games;
 using Risk.Application.Players;
+using Risk.Application.Services;
 using Risk.Domain.Entities;
 
 namespace Risk.Tests.Application;
@@ -28,6 +29,8 @@ public class GameAndPlayerServiceTests
             _currentUser,
             access,
             new ForcedCardTradeGuard(new FakeBonusCardRepository()),
+            new ConquestResolver(
+                new FakeBonusCardRepository(), new FakeMissionCardRepository(), new FakeMapRepository()),
             fogOfWar);
         _playerService = new PlayerService(
             new FakePlayerRepository(_games),

@@ -87,6 +87,17 @@ public class TurnTimeoutServiceTests
     }
 
     [Fact]
+    public async Task A_turn_that_times_out_in_the_attack_phase_still_gets_its_conquest_card()
+    {
+        var f = Create();
+        f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));
+
+        await f.Service.AdvanceTimedOutTurnsAsync(f.TimedOutAt);
+
+        Assert.Single(await f.BonusCards.GetByPlayerIdAsync(f.Game.Id, f.Red.Id));
+    }
+
+    [Fact]
     public async Task The_timeout_eliminates_a_defeated_player_and_hands_over_their_cards()
     {
         var f = Create(blueOnlyHasTarget: true, threePlayers: true);

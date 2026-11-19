@@ -16,6 +16,5 @@ public record AttackResultDto(
     IReadOnlyList<int> AttackerDice,
     IReadOnlyList<int> DefenderDice,
     bool TerritoryConquered,
-    int TroopsMoved = 0,
-    bool BonusCardAwarded = false
+    int TroopsMoved = 0
 );

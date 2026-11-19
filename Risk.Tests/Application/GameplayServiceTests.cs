@@ -25,6 +25,7 @@ public class GameplayServiceTests
     private sealed class Fixture
     {
         public required GameplayService Service { get; init; }
+        public required ConquestResolver Resolver { get; init; }
         public required Game Game { get; init; }
         public required Player Red { get; init; }
         public required Player Blue { get; init; }
@@ -79,7 +80,7 @@ public class GameplayServiceTests
 
         return new Fixture
         {
-            Service = service, Game = game, Red = red, Blue = blue, Green = green,
+            Service = service, Resolver = resolver, Game = game, Red = red, Blue = blue, Green = green,
             From = from, To = to, Dice = dice, BonusCards = bonusCards, UnitOfWork = unitOfWork,
         };
     }
@@ -220,6 +221,51 @@ public class GameplayServiceTests
         Assert.Equal(f.Red.Id, f.To.OwnerId);
         Assert.Equal(2, f.To.TroopCount);
         Assert.False(f.Blue.IsEliminated);
+    }
+
+    // ---- The card earned by conquering -----------------------------------
+
+    [Fact]
+    public async Task The_conquest_card_is_handed_out_when_the_attack_phase_ends_and_not_before()
+    {
+        var f = Create();
+        f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));
+
+        await f.Service.AttackAsync(Attack(f, moving: 2));
+
+        Assert.Equal(0, await HandSizeAsync(f, f.Red));
+
+        f.Game.EndPhase(f.Red.Id, GamePhase.Fortify, ClassicMap.Graph, DateTimeOffset.UtcNow);
+        var awarded = await f.Resolver.AwardConquestCardAsync(f.Game, f.Red.Id);
+
+        Assert.True(awarded);
+        Assert.Equal(1, await HandSizeAsync(f, f.Red));
+    }
+
+    [Fact]
+    public async Task No_conquest_card_is_handed_out_for_a_turn_without_a_conquest()
+    {
+        var f = Create();
+        f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));
+
+        f.Game.EndPhase(f.Red.Id, GamePhase.Fortify, ClassicMap.Graph, DateTimeOffset.UtcNow);
+        var awarded = await f.Resolver.AwardConquestCardAsync(f.Game, f.Red.Id);
+
+        Assert.False(awarded);
+        Assert.Equal(0, await HandSizeAsync(f, f.Red));
+    }
+
+    [Fact]
+    public async Task Cards_taken_from_an_eliminated_player_change_hands_at_once_but_the_conquest_card_waits()
+    {
+        var f = Create(blueOnlyHasTarget: true, threePlayers: true);
+        GiveCards(f, f.Blue, 2);
+        f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));
+
+        await f.Service.AttackAsync(Attack(f, moving: 2));
+
+        Assert.True(f.Blue.IsEliminated);
+        Assert.Equal(2, await HandSizeAsync(f, f.Red));
     }
 
     // ---- Cards taken over from an eliminated player ----------------------
