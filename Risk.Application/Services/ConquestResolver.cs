@@ -74,6 +74,11 @@ public sealed class ConquestResolver(
     public async Task<bool> AwardConquestCardAsync(
         Game game, Guid playerId, CancellationToken cancellationToken = default)
     {
+        var player = game.FindPlayer(playerId)
+                     ?? throw new BusinessRuleException("The player is not part of the game.");
+        if (game.CurrentPlayerId != player.Id)
+            throw new BusinessRuleException("Only the player whose turn it is can receive the conquest card.");
+
         if (!game.HasConqueredTerritoryThisTurn)
             return false;
 
@@ -81,8 +86,6 @@ public sealed class ConquestResolver(
         if (card is null)
             return false;
 
-        var player = game.FindPlayer(playerId)
-                     ?? throw new BusinessRuleException("The player is not part of the game.");
         card.AssignToPlayer(player.Id);
         return true;
     }

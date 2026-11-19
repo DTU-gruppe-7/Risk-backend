@@ -256,6 +256,18 @@ public class GameplayServiceTests
     }
 
     [Fact]
+    public async Task Only_the_player_whose_turn_it_is_can_receive_the_conquest_card()
+    {
+        var f = Create();
+        f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));
+        await f.Service.AttackAsync(Attack(f, moving: 2));
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => f.Resolver.AwardConquestCardAsync(f.Game, f.Blue.Id));
+        Assert.Equal(0, await HandSizeAsync(f, f.Blue));
+    }
+
+    [Fact]
     public async Task Cards_taken_from_an_eliminated_player_change_hands_at_once_but_the_conquest_card_waits()
     {
         var f = Create(blueOnlyHasTarget: true, threePlayers: true);
