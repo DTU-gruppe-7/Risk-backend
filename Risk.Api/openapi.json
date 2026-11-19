@@ -3142,10 +3142,6 @@
             ],
             "format": "int32",
             "default": 0
-          },
-          "bonusCardAwarded": {
-            "type": "boolean",
-            "default": false
           }
         }
       },
@@ -3270,10 +3266,6 @@
             ],
             "format": "int32",
             "default": 0
-          },
-          "bonusCardAwarded": {
-            "type": "boolean",
-            "default": false
           }
         }
       },

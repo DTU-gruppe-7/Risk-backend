@@ -24,6 +24,5 @@ public record BlitzResultDto(
     int RemainingAttackingTerritoryTroops,
     int RemainingDefendingTerritoryTroops,
     IReadOnlyList<BlitzRoundDto> Rounds,
-    int TroopsMoved = 0,
-    bool BonusCardAwarded = false
+    int TroopsMoved = 0
 );

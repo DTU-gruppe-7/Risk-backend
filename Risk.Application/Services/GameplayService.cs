@@ -56,7 +56,6 @@ public sealed class GameplayService(
 
         var conquered = context.To.TroopCount == 0;
         var troopsMoved = 0;
-        var bonusCardAwarded = false;
         if (conquered && dto.MovingTroopsCount is null)
         {
             // Same flow as blitz: the attacker finishes via /conquest.
@@ -66,10 +65,9 @@ public sealed class GameplayService(
         {
             troopsMoved = dto.MovingTroopsCount!.Value;
             context.Game.BeginPendingConquest(context.PlayerId, context.From, context.To);
-            var outcome = await FinishConquestAsync(
+            await FinishConquestAsync(
                 context.Game, context.PlayerId, context.From, context.To, troopsMoved,
                 cancellationToken);
-            bonusCardAwarded = outcome.BonusCardAwarded;
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -80,8 +78,7 @@ public sealed class GameplayService(
             AttackerDice: battle.SortedAttackerDice,
             DefenderDice: battle.SortedDefenderDice,
             TerritoryConquered: conquered,
-            TroopsMoved: troopsMoved,
-            BonusCardAwarded: bonusCardAwarded);
+            TroopsMoved: troopsMoved);
     }
 
     public async Task<BlitzResultDto> BlitzAttackAsync(
@@ -116,7 +113,6 @@ public sealed class GameplayService(
 
         var conquered = context.To.TroopCount == 0;
         var troopsMoved = 0;
-        var bonusCardAwarded = false;
         if (conquered)
         {
             if (dto.MovingTroopsCount is null)
@@ -129,10 +125,9 @@ public sealed class GameplayService(
                 troopsMoved = dto.MovingTroopsCount.Value;
                 context.Game.BeginPendingConquest(
                     context.PlayerId, context.From, context.To);
-                var outcome = await FinishConquestAsync(
+                await FinishConquestAsync(
                     context.Game, context.PlayerId, context.From, context.To, troopsMoved,
                     cancellationToken);
-                bonusCardAwarded = outcome.BonusCardAwarded;
             }
         }
 
@@ -145,8 +140,7 @@ public sealed class GameplayService(
             RemainingAttackingTerritoryTroops: context.From.TroopCount,
             RemainingDefendingTerritoryTroops: context.To.TroopCount,
             Rounds: rounds,
-            TroopsMoved: troopsMoved,
-            BonusCardAwarded: bonusCardAwarded);
+            TroopsMoved: troopsMoved);
     }
 
     public async Task CompleteConquestAsync(

@@ -2,6 +2,7 @@ using Risk.Application.Common;
 using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
+using Risk.Application.Services;
 using Risk.Domain.Entities;
 using Risk.Domain.Map;
 
@@ -16,6 +17,7 @@ public sealed class GameService(
     ICurrentUser currentUser,
     GameAccess access,
     ForcedCardTradeGuard forcedCardTrade,
+    ConquestResolver conquestResolver,
     FogOfWar fogOfWar)
 {
     public async Task<IReadOnlyList<GameSummaryResponse>> GetAllAsync(GameState? state, CancellationToken ct = default)
@@ -75,6 +77,12 @@ public sealed class GameService(
         await forcedCardTrade.EnsureCompletedAsync(game, player.Id, ct);
 
         game.EndPhase(player.Id, request.Phase, graph, DateTimeOffset.UtcNow);
+
+        // The card for conquering is handed out as the attack phase ends. Cards can only be traded
+        // in Deployment, so the player cannot use it before their next turn.
+        if (game.CurrentPhase == GamePhase.Fortify)
+            await conquestResolver.AwardConquestCardAsync(game, player.Id, ct);
+
         await unitOfWork.SaveChangesAsync(ct);
         return ToResponse(game);
     }

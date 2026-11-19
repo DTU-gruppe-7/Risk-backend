@@ -5,12 +5,17 @@ using Risk.Domain.Exceptions;
 namespace Risk.Application.Services;
 
 /// <summary>What a resolved conquest changed, for the caller's response.</summary>
-public sealed record ConquestOutcome(bool BonusCardAwarded, bool PlayerEliminated);
+public sealed record ConquestOutcome(bool PlayerEliminated);
 
 /// <summary>
 /// Everything that follows once a territory has changed hands: eliminating the defeated player
-/// and taking over their cards, awarding the conquest card and checking for a winner.
+/// and taking over their cards, noting that the attacker has earned a card and checking for a winner.
 /// Attacks, blitz attacks and manually completed conquests all end here, so the rules exist once.
+/// <para>
+/// The card earned by conquering is not handed out here but when the attack phase is over
+/// (<see cref="AwardConquestCardAsync"/>), so it can never be traded in the turn it was earned.
+/// Cards taken over from an eliminated player are the exception: they change hands right away.
+/// </para>
 /// </summary>
 public sealed class ConquestResolver(
     IBonusCardRepository bonusCards,
@@ -26,9 +31,7 @@ public sealed class ConquestResolver(
         var eliminated = takenCards is not null;
         attackerHand += takenCards ?? 0;
 
-        var awarded = await AwardConquestCardAsync(game, attackerId, cancellationToken);
-        if (awarded)
-            attackerHand++;
+        game.RecordConquest(attackerId);
 
         await EvaluateVictoryAsync(game, attackerId, cancellationToken);
 
@@ -41,7 +44,7 @@ public sealed class ConquestResolver(
             game.ReturnToDeploymentForCardTrade();
         }
 
-        return new ConquestOutcome(awarded, eliminated);
+        return new ConquestOutcome(eliminated);
     }
 
     /// <summary>Returns the number of cards taken over, or null when nobody was eliminated.</summary>
@@ -63,18 +66,26 @@ public sealed class ConquestResolver(
         return defeatedCards.Count;
     }
 
-    private async Task<bool> AwardConquestCardAsync(
-        Game game, Guid attackerId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Hands out the card for conquering at least one territory this turn. Call it once per turn,
+    /// when the player's attack phase is over. Returns false when no card was earned or the draw
+    /// pile is empty.
+    /// </summary>
+    public async Task<bool> AwardConquestCardAsync(
+        Game game, Guid playerId, CancellationToken cancellationToken = default)
     {
-        if (!game.RecordConquest(attackerId))
+        var player = game.FindPlayer(playerId)
+                     ?? throw new BusinessRuleException("The player is not part of the game.");
+        if (game.CurrentPlayerId != player.Id)
+            throw new BusinessRuleException("Only the player whose turn it is can receive the conquest card.");
+
+        if (!game.HasConqueredTerritoryThisTurn)
             return false;
 
         var card = await bonusCards.GetNextUnassignedAsync(game.Id, cancellationToken);
         if (card is null)
             return false;
 
-        var player = game.FindPlayer(attackerId)
-                     ?? throw new BusinessRuleException("Attacking player is not part of the game.");
         card.AssignToPlayer(player.Id);
         return true;
     }

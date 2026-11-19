@@ -2,6 +2,7 @@ using Risk.Application.Common;
 using Risk.Application.Exceptions;
 using Risk.Application.Games;
 using Risk.Application.Players;
+using Risk.Application.Services;
 using Risk.Domain.Entities;
 
 namespace Risk.Tests.Application;
@@ -11,6 +12,7 @@ public class GameAndPlayerServiceTests
     private readonly Guid _host = Guid.NewGuid();
     private readonly FakeGameRepository _games = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly FakeBonusCardRepository _bonusCards = new();
     private readonly FakeCurrentUser _currentUser;
     private readonly GameService _gameService;
     private readonly PlayerService _playerService;
@@ -23,11 +25,12 @@ public class GameAndPlayerServiceTests
         _gameService = new GameService(
             _games,
             new FakeMapRepository(),
-            new GameDeckSetup(new FakeBonusCardRepository(), new FakeMissionCardRepository()),
+            new GameDeckSetup(_bonusCards, new FakeMissionCardRepository()),
             _unitOfWork,
             _currentUser,
             access,
-            new ForcedCardTradeGuard(new FakeBonusCardRepository()),
+            new ForcedCardTradeGuard(_bonusCards),
+            new ConquestResolver(_bonusCards, new FakeMissionCardRepository(), new FakeMapRepository()),
             fogOfWar);
         _playerService = new PlayerService(
             new FakePlayerRepository(_games),
@@ -66,6 +69,48 @@ public class GameAndPlayerServiceTests
         var started = await _gameService.StartAsync(game.Id);
         Assert.Equal(GameState.InProgress, started.State);
         Assert.Equal(42, _games.Games.Single().Territories.Count);
+    }
+
+    /// <summary>Starts a two-player game and leaves the current player in their Attack phase.</summary>
+    private async Task<(Game Game, Player Player)> StartGameInAttackPhaseAsync()
+    {
+        var created = await CreateGameAsync();
+        await _playerService.JoinAsync(created.Id, new JoinGameRequest("red"));
+        _currentUser.UserId = Guid.NewGuid();
+        await _playerService.JoinAsync(created.Id, new JoinGameRequest("blue"));
+        _currentUser.UserId = _host;
+        await _gameService.StartAsync(created.Id);
+
+        var game = _games.Games.Single();
+        var player = game.Players.Single(p => p.Id == game.CurrentPlayerId);
+        var territory = game.Territories.First(t => t.OwnerId == player.Id);
+        // Placing the last reinforcement moves the game on to the Attack phase.
+        game.DeployTroops(player.Id, territory, player.ReinforcementTroops);
+        Assert.Equal(GamePhase.Attack, game.CurrentPhase);
+
+        _currentUser.UserId = player.UserId;
+        return (game, player);
+    }
+
+    [Fact]
+    public async Task Ending_the_attack_phase_after_a_conquest_hands_out_the_conquest_card()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+        game.RecordConquest(player.Id);
+
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+
+        Assert.Single(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+    }
+
+    [Fact]
+    public async Task Ending_the_attack_phase_without_a_conquest_hands_out_no_card()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+
+        Assert.Empty(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
     }
 
     [Fact]
