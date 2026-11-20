@@ -17,10 +17,6 @@ public sealed record BonusCardResponse(
         new(b.Id, b.GameId, b.PlayerId, b.Type, b.TerritoryIdentifier, b.Used);
 }
 
-/// <summary>Payload to assign a card to a player.</summary>
-/// <param name="PlayerId">Player receiving the card.</param>
-public sealed record AssignCardRequest(Guid PlayerId);
-
 public sealed record TradeCardsRequest(IReadOnlyList<Guid> CardIds);
 
 public sealed record TradeCardsResponse(int TroopsAwarded);
@@ -41,7 +37,3 @@ public sealed record MissionCardResponse(
         new(m.Id, m.GameId, m.PlayerId, m.Title, m.Description, m.IsCompleted,
             m.ObjectiveType, m.TargetIdentifier, m.TargetPlayerId);
 }
-
-/// <summary>Payload to assign a mission card to a player.</summary>
-/// <param name="PlayerId">Player who receives this mission.</param>
-public sealed record AssignMissionRequest(Guid PlayerId);
