@@ -2,7 +2,6 @@ using Risk.Application.Common;
 using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
-using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
 
 namespace Risk.Application.Cards;
@@ -24,14 +23,6 @@ public sealed class BonusCardService(
         return list.Select(BonusCardResponse.From).ToList();
     }
 
-    public async Task<BonusCardResponse> AssignAsync(Guid gameId, Guid id, AssignCardRequest request, CancellationToken ct = default)
-    {
-        var game = await access.RequireParticipantAsync(gameId, ct);
-        EnsureInProgress(game);
-        GameAccess.RequirePlayerInGame(game, request.PlayerId);
-        return await ChangeAsync(gameId, id, card => card.AssignToPlayer(request.PlayerId), ct);
-    }
-
     public async Task<TradeCardsResponse> TradeAsync(
         Guid gameId, TradeCardsRequest request, CancellationToken ct = default)
     {
@@ -49,19 +40,5 @@ public sealed class BonusCardService(
         var troops = game.TradeBonusCards(player.Id, selected);
         await unitOfWork.SaveChangesAsync(ct);
         return new TradeCardsResponse(troops);
-    }
-
-    private async Task<BonusCardResponse> ChangeAsync(Guid gameId, Guid id, Action<BonusCard> change, CancellationToken ct)
-    {
-        var card = await cards.GetAsync(gameId, id, ct) ?? throw new NotFoundException("Bonus card", id);
-        change(card);
-        await unitOfWork.SaveChangesAsync(ct);
-        return BonusCardResponse.From(card);
-    }
-
-    private static void EnsureInProgress(Game game)
-    {
-        if (game.State != GameState.InProgress)
-            throw new BusinessRuleException("Bonus cards can only be changed while the game is in progress.");
     }
 }

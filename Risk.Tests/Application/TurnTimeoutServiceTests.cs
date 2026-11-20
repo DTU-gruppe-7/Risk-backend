@@ -61,9 +61,15 @@ public class TurnTimeoutServiceTests
         return new Fixture
         {
             Service = new TurnTimeoutService(games, new FakeMapRepository(), resolver, unitOfWork),
-            Game = game, Red = red, Blue = blue, Green = green, From = from, To = to,
+            Game = game,
+            Red = red,
+            Blue = blue,
+            Green = green,
+            From = from,
+            To = to,
             TimedOutAt = game.TurnStartedAt!.Value.AddSeconds(10),
-            BonusCards = bonusCards, UnitOfWork = unitOfWork,
+            BonusCards = bonusCards,
+            UnitOfWork = unitOfWork,
         };
     }
 

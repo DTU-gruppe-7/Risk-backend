@@ -54,6 +54,7 @@ jobs:
     timeout-minutes: 20
     env:
       CONN: Host=db;Port=5432;Database=risk;Username=ci;Password=ci;GSS Encryption Mode=Disable
+      APP_CONN: Host=db;Port=5432;Database=risk;Username=risk_app;Password=ci-app;GSS Encryption Mode=Disable
       # Samme hærdning som på serveren, så read-only-problemer fanges her
       HARDENING: --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true
     steps:
@@ -104,12 +105,14 @@ jobs:
               -e DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp \
               -e ConnectionStrings__Default="$CONN" risk-migrator:ci
           done
+      - name: Giv API'ets databaserolle et password
+        run: docker exec db psql -U ci -d risk -v ON_ERROR_STOP=1 -c "ALTER ROLE risk_app PASSWORD 'ci-app'"
 
       - name: Start API og vent på /readyz
         run: |
           docker run -d --name api --network ci -p 8080:8080 $HARDENING \
             -e ASPNETCORE_ENVIRONMENT=Production \
-            -e ConnectionStrings__Default="$CONN" \
+            -e ConnectionStrings__Default="$APP_CONN" \
             -e Jwt__Key="$(openssl rand -base64 48)" \
             -e Jwt__Issuer=ci -e Jwt__Audience=ci \
             risk-api:ci

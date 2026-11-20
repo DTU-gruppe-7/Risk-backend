@@ -22,21 +22,6 @@ public sealed class BonusCardsController(BonusCardService cards) : ControllerBas
     public async Task<ActionResult<IEnumerable<BonusCardResponse>>> GetAll(Guid gameId, [FromQuery] Guid? playerId, CancellationToken ct)
         => Ok(await cards.GetAllAsync(gameId, playerId, ct));
 
-    /// <summary>Assigns a bonus card from the draw pile to a player.</summary>
-    /// <response code="200">Card assigned.</response>
-    /// <response code="400">The player is not part of this game.</response>
-    /// <response code="403">Caller is not part of the game.</response>
-    /// <response code="404">Card not found.</response>
-    /// <response code="409">Card already used.</response>
-    [HttpPut("{id:guid}/assign")]
-    [ProducesResponseType<BonusCardResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<BonusCardResponse>> Assign(Guid gameId, Guid id, [FromBody] AssignCardRequest request, CancellationToken ct)
-        => Ok(await cards.AssignAsync(gameId, id, request, ct));
-
     /// <summary>Trades exactly three cards for escalating reinforcement troops.</summary>
     [HttpPost("trade-in")]
     [ProducesResponseType<TradeCardsResponse>(StatusCodes.Status200OK)]

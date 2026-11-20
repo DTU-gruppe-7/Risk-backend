@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Risk.Api.Controllers;
 
 /// <summary>Simpelt endpoint til at verificere at API og typegenerering virker.</summary>
 [ApiController]
+[AllowAnonymous]
 [Route("api/[controller]")]
 public sealed class PingController : ControllerBase
 {

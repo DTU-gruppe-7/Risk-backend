@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Risk.Application.Auth;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Risk.Api.Controllers;
 
@@ -9,10 +11,12 @@ namespace Risk.Api.Controllers;
 /// The refresh token is only ever sent as an HttpOnly cookie, so JavaScript (and XSS) cannot read it.
 /// </summary>
 [ApiController]
+[AllowAnonymous]
 [Route("api/[controller]")]
 public sealed class AuthController(AuthService auth, IWebHostEnvironment environment) : ControllerBase
 {
     private const string RefreshCookieName = "risk_refresh";
+    internal const string RateLimitPolicy = "auth";
 
     // The browser only sends the cookie to the auth endpoints, not to every API call.
     private const string RefreshCookiePath = "/api/auth";
@@ -21,6 +25,7 @@ public sealed class AuthController(AuthService auth, IWebHostEnvironment environ
     /// <response code="200">Registration succeeded.</response>
     /// <response code="400">Validation failed or email already taken.</response>
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitPolicy)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request, CancellationToken ct)
@@ -30,6 +35,7 @@ public sealed class AuthController(AuthService auth, IWebHostEnvironment environ
     /// <response code="200">Login succeeded.</response>
     /// <response code="401">Email or password incorrect.</response>
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicy)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)

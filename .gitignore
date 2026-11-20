@@ -77,3 +77,6 @@ devcert.pem
 Thumbs.db
 ehthumbs.db
 desktop.ini
+
+# Claude Code (lokal, ikke versioneret)
+CLAUDE.md
