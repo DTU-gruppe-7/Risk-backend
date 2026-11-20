@@ -37,7 +37,7 @@ public sealed class GameUpdatePublisher(
                 continue;
             }
 
-            foreach (var userId in Participants(game))
+            foreach (var userId in game.ParticipantUserIds)
                 await realtime.SendToUserInGameAsync(game.Id, userId, Build(game, graph, userId));
         }
     }
@@ -52,9 +52,6 @@ public sealed class GameUpdatePublisher(
         return Build(game, graph, userId);
     }
 
-    private static IEnumerable<Guid> Participants(Game game) =>
-        game.Players.Select(player => player.UserId).Append(game.HostId).Distinct();
-
     private static GameUpdateMessage Build(Game game, MapGraph graph, Guid? viewerUserId)
     {
         var territories = game.Territories.OrderBy(territory => territory.Identifier);
@@ -64,17 +61,14 @@ public sealed class GameUpdatePublisher(
                 territories.Select(TerritoryResponse.From).ToList());
 
         var viewerPlayerId = game.Players.FirstOrDefault(player => player.UserId == viewerUserId)?.Id;
-
-        // A host who is not playing has no position on the board, so under fog they see no territories
-        // (the REST endpoint refuses them the same way).
-        var visible = viewerPlayerId is { } playerId
-            ? FogOfWar.VisibleTerritoriesFor(game, graph, playerId)
+        var visible = viewerUserId is { } userId
+            ? FogOfWar.VisibleTerritoriesForUser(game, graph, userId)!
             : new HashSet<string>();
 
         return new GameUpdateMessage(
             GameDetailResponse.From(game, viewerPlayerId),
             territories
-                .Where(territory => visible!.Contains(territory.Identifier))
+                .Where(territory => visible.Contains(territory.Identifier))
                 .Select(TerritoryResponse.From)
                 .ToList());
     }

@@ -63,6 +63,20 @@ public sealed record GameDetailResponse(
 /// <param name="Territories">The territories the receiver may see, ordered by identifier.</param>
 public sealed record GameUpdateMessage(GameDetailResponse Game, IReadOnlyList<TerritoryResponse> Territories);
 
+/// <summary>
+/// The territories the current player has picked, sent over the game hub as a visual hint for the
+/// other players. Ids are territory state ids (<see cref="TerritoryResponse.Id"/>). Both null clears the selection.
+/// </summary>
+public sealed record SelectTerritoriesRequest(Guid? SourceTerritoryId, Guid? TargetTerritoryId);
+
+/// <summary>
+/// Pushed over the game hub when the current player's selection changes. Under fog of war a territory
+/// the receiver cannot see is sent as null.
+/// </summary>
+/// <param name="PlayerId">The selecting player's id (<see cref="PlayerSummaryResponse.Id"/>), not the user id.</param>
+public sealed record TerritorySelectionDto(
+    Guid GameId, Guid PlayerId, Guid? SourceTerritoryId, Guid? TargetTerritoryId);
+
 /// <summary>Game configuration snapshot.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
 public sealed record GameSettingResponse(

@@ -67,6 +67,10 @@ public sealed class Game
     public bool HasParticipant(Guid userId) =>
         IsHost(userId) || _players.Any(p => p.UserId == userId);
 
+    /// <summary>The user ids of every player and the host, each once (a host who plays is not repeated).</summary>
+    public IEnumerable<Guid> ParticipantUserIds =>
+        _players.Select(p => p.UserId).Append(HostId).Distinct();
+
     public Player? FindPlayer(Guid playerId) => _players.FirstOrDefault(p => p.Id == playerId);
 
     /// <summary>The board with this game's territory state. Requires <see cref="Territories"/> to be loaded.</summary>

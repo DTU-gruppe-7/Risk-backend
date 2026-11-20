@@ -94,7 +94,117 @@ public sealed class GameHubTests(ApiFixture api)
         Assert.Contains("not part of this game", error.Message);
     }
 
+    [Fact]
+    public async Task The_current_players_selection_is_relayed_live_to_the_others_only()
+    {
+        var red = await api.RegisterAsync("red");
+        var blue = await api.RegisterAsync("blue");
+        var gameId = await CreateGameAsync(red, fog: false, blue);
+        var turn = await StartAsync(gameId, red, blue);
+
+        await using var currentHub = await api.ConnectGameHubAsync(turn.Current);
+        await using var waitingHub = await api.ConnectGameHubAsync(turn.Waiting);
+        var currentSelections = CollectSelections(currentHub);
+        var waitingSelections = CollectSelections(waitingHub);
+        await currentHub.InvokeAsync("JoinGame", gameId);
+        await waitingHub.InvokeAsync("JoinGame", gameId);
+        var versionBefore = await VersionAsync(turn.Current, gameId);
+
+        var source = turn.TerritoryOwnedBy(turn.CurrentPlayerId);
+        var target = turn.TerritoryOwnedBy(turn.WaitingPlayerId);
+        await currentHub.InvokeAsync("SelectTerritories", gameId,
+            new { sourceTerritoryId = source, targetTerritoryId = target });
+
+        var selected = await NextAsync(waitingSelections, _ => true);
+        Assert.Equal(gameId, selected.GetProperty("gameId").GetGuid());
+        Assert.Equal(turn.CurrentPlayerId, selected.GetProperty("playerId").GetGuid());
+        Assert.Equal(source, selected.GetProperty("sourceTerritoryId").GetGuid());
+        Assert.Equal(target, selected.GetProperty("targetTerritoryId").GetGuid());
+
+        // Both null clears the selection; the nulls are on the wire, not left out.
+        await currentHub.InvokeAsync("SelectTerritories", gameId,
+            new { sourceTerritoryId = (Guid?)null, targetTerritoryId = (Guid?)null });
+        var cleared = await NextAsync(waitingSelections, _ => true);
+        Assert.Equal(JsonValueKind.Null, cleared.GetProperty("sourceTerritoryId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, cleared.GetProperty("targetTerritoryId").ValueKind);
+
+        // The caller never receives their own selection, and nothing was saved.
+        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        Assert.False(currentSelections.TryRead(out _));
+        Assert.Equal(versionBefore, await VersionAsync(turn.Current, gameId));
+    }
+
+    [Fact]
+    public async Task Only_the_current_player_may_select_and_only_this_games_territories()
+    {
+        var red = await api.RegisterAsync("red");
+        var blue = await api.RegisterAsync("blue");
+        var outsider = await api.RegisterAsync("outsider");
+        var gameId = await CreateGameAsync(red, fog: false, blue);
+        var turn = await StartAsync(gameId, red, blue);
+
+        var otherGameId = await CreateGameAsync(outsider, fog: false, await api.RegisterAsync("other"));
+        (await outsider.Http.PutAsync($"/api/games/{otherGameId}/start", null)).EnsureSuccessStatusCode();
+        var foreignTerritory = (await outsider.Http.GetFromJsonAsync<JsonElement>($"/api/games/{otherGameId}/territories"))
+            .EnumerateArray().First().GetProperty("id").GetGuid();
+
+        await using var currentHub = await api.ConnectGameHubAsync(turn.Current);
+        await using var waitingHub = await api.ConnectGameHubAsync(turn.Waiting);
+        await using var outsiderHub = await api.ConnectGameHubAsync(outsider);
+        var waitingSelections = CollectSelections(waitingHub);
+        await waitingHub.InvokeAsync("JoinGame", gameId);
+
+        var notYourTurn = await Assert.ThrowsAsync<HubException>(() => waitingHub.InvokeAsync(
+            "SelectTerritories", gameId, new { sourceTerritoryId = (Guid?)null, targetTerritoryId = (Guid?)null }));
+        Assert.Contains("not this player's turn", notYourTurn.Message);
+
+        var notInGame = await Assert.ThrowsAsync<HubException>(() => outsiderHub.InvokeAsync(
+            "SelectTerritories", gameId, new { sourceTerritoryId = (Guid?)null, targetTerritoryId = (Guid?)null }));
+        Assert.Contains("not a player in this game", notInGame.Message);
+
+        await Assert.ThrowsAsync<HubException>(() => currentHub.InvokeAsync(
+            "SelectTerritories", gameId, new { sourceTerritoryId = foreignTerritory, targetTerritoryId = (Guid?)null }));
+
+        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        Assert.False(waitingSelections.TryRead(out _));
+    }
+
     // -------------------------------------------------------------------------
+
+    private sealed record Turn(
+        TestUser Current, TestUser Waiting, Guid CurrentPlayerId, Guid WaitingPlayerId, JsonElement Territories)
+    {
+        public Guid TerritoryOwnedBy(Guid playerId) =>
+            Territories.EnumerateArray()
+                .First(t => t.GetProperty("ownerId").GetString() == playerId.ToString())
+                .GetProperty("id").GetGuid();
+    }
+
+    /// <summary>Starts a two-player game and works out whose turn it is.</summary>
+    private static async Task<Turn> StartAsync(Guid gameId, TestUser host, TestUser other)
+    {
+        (await host.Http.PutAsync($"/api/games/{gameId}/start", null)).EnsureSuccessStatusCode();
+        var game = await host.Http.GetFromJsonAsync<JsonElement>($"/api/games/{gameId}");
+        var currentPlayerId = game.GetProperty("currentPlayerId").GetGuid();
+        var players = game.GetProperty("players").EnumerateArray().ToList();
+        var currentUserId = players.Single(p => p.GetProperty("id").GetGuid() == currentPlayerId)
+            .GetProperty("userId").GetGuid();
+        var (current, waiting) = currentUserId == host.Id ? (host, other) : (other, host);
+        var waitingPlayerId = players.Single(p => p.GetProperty("userId").GetGuid() == waiting.Id)
+            .GetProperty("id").GetGuid();
+        var territories = await host.Http.GetFromJsonAsync<JsonElement>($"/api/games/{gameId}/territories");
+        return new Turn(current, waiting, currentPlayerId, waitingPlayerId, territories);
+    }
+
+    private static async Task<long> VersionAsync(TestUser user, Guid gameId) =>
+        (await user.Http.GetFromJsonAsync<JsonElement>($"/api/games/{gameId}")).GetProperty("version").GetInt64();
+
+    private static ChannelReader<JsonElement> CollectSelections(HubConnection hub)
+    {
+        var channel = Channel.CreateUnbounded<JsonElement>();
+        hub.On<JsonElement>("SelectionChanged", body => channel.Writer.TryWrite(body));
+        return channel.Reader;
+    }
 
     private static async Task<Guid> CreateGameAsync(TestUser host, bool fog, params TestUser[] others)
     {
@@ -125,7 +235,7 @@ public sealed class GameHubTests(ApiFixture api)
     }
 
     /// <summary>The next update matching the predicate. Earlier ones are skipped, later ones are kept.</summary>
-    private static async Task<Update> NextAsync(ChannelReader<Update> updates, Func<Update, bool> match)
+    private static async Task<T> NextAsync<T>(ChannelReader<T> updates, Func<T, bool> match)
     {
         using var timeout = new CancellationTokenSource(Timeout);
         while (true)

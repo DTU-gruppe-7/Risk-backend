@@ -152,4 +152,12 @@ internal sealed class FakeGameRealtime : IGameRealtime
         ToUser.Add((gameId, userId, update));
         return Task.CompletedTask;
     }
+
+    public List<(Guid GameId, Guid UserId, TerritorySelectionDto Selection)> Selections { get; } = [];
+
+    public Task SendSelectionToUserInGameAsync(Guid gameId, Guid userId, TerritorySelectionDto selection)
+    {
+        Selections.Add((gameId, userId, selection));
+        return Task.CompletedTask;
+    }
 }

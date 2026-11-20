@@ -13,4 +13,7 @@ public interface IGameRealtime
 
     /// <summary>Sends an update only to the given user's connections watching the game.</summary>
     Task SendToUserInGameAsync(Guid gameId, Guid userId, GameUpdateMessage update);
+
+    /// <summary>Sends a territory selection only to the given user's connections watching the game.</summary>
+    Task SendSelectionToUserInGameAsync(Guid gameId, Guid userId, TerritorySelectionDto selection);
 }

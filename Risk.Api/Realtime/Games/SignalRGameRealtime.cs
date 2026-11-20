@@ -12,4 +12,7 @@ public sealed class SignalRGameRealtime(IHubContext<GameHub, IGameClient> hub) :
 
     public Task SendToUserInGameAsync(Guid gameId, Guid userId, GameUpdateMessage update) =>
         hub.Clients.Group(RealtimeGroups.UserInGame(gameId, userId)).GameUpdated(update);
+
+    public Task SendSelectionToUserInGameAsync(Guid gameId, Guid userId, TerritorySelectionDto selection) =>
+        hub.Clients.Group(RealtimeGroups.UserInGame(gameId, userId)).SelectionChanged(selection);
 }

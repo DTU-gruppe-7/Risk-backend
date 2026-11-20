@@ -48,6 +48,26 @@ public sealed class GameAccess(
         return game;
     }
 
+    /// <summary>
+    /// The game (with details) and the given user's player, if the game is in progress and it is
+    /// that player's turn. For callers that know the user without an HTTP request, such as realtime hubs.
+    /// </summary>
+    public async Task<(Game Game, Player Player)> RequireCurrentTurnAsync(
+        Guid gameId, Guid userId, CancellationToken ct = default)
+    {
+        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
+                   ?? throw new NotFoundException("Game", gameId);
+        var player = game.Players.FirstOrDefault(p => p.UserId == userId)
+                     ?? throw new ForbiddenException("You are not a player in this game.");
+        if (player.IsEliminated)
+            throw new ForbiddenException("You have been eliminated from this game.");
+        if (game.State != GameState.InProgress)
+            throw new BusinessRuleException("The game is not in progress.");
+        if (game.CurrentPlayerId != player.Id)
+            throw new BusinessRuleException("It is not this player's turn.");
+        return (game, player);
+    }
+
     public Player RequireCurrentPlayer(Game game) =>
         game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)
         ?? throw new ForbiddenException("You are not a player in this game.");

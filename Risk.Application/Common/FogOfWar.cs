@@ -41,6 +41,22 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
             ? game.BoardOn(graph).VisibleTo(viewerPlayerId)
             : null;
 
+    /// <summary>
+    /// The territories a given user can see, or null when the game has no fog of war.
+    /// A host who is not playing has no position on the board, so under fog they see nothing
+    /// (the REST endpoint refuses them the same way). For realtime pushes, which address users.
+    /// </summary>
+    public static IReadOnlySet<string>? VisibleTerritoriesForUser(Game game, MapGraph graph, Guid viewerUserId)
+    {
+        if (game.Settings?.HasFogOfWar != true)
+            return null;
+
+        var viewerPlayerId = game.Players.FirstOrDefault(player => player.UserId == viewerUserId)?.Id;
+        return viewerPlayerId is { } playerId
+            ? VisibleTerritoriesFor(game, graph, playerId)
+            : new HashSet<string>();
+    }
+
     /// <summary>Rejects a target the player cannot see, so fog cannot be probed by attacking.</summary>
     public void EnsureTargetVisible(Game game, MapGraph graph, Guid playerId, Territory target)
     {
