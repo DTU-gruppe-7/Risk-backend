@@ -215,6 +215,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PendingConquestToTerritoryId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Round")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 

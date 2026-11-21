@@ -91,6 +91,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(g => g.PendingConquestToTerritoryId);
             entity.Property(g => g.WinnerId);
             entity.Property(g => g.BonusCardTradeCount).IsRequired();
+            entity.Property(g => g.Round).IsRequired();
 
             // Explicit FK from HostId → User
             entity.HasOne<User>()

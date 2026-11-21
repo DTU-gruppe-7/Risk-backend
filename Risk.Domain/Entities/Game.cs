@@ -32,6 +32,18 @@ public sealed class Game
 
     public GamePhase CurrentPhase { get; private set; } = GamePhase.Deployment;
 
+    /// <summary>
+    /// The current round, starting at 1 when the game starts. A new round begins when the turn
+    /// passes back to the first active player in turn order. 0 while in the Lobby.
+    /// </summary>
+    public int Round { get; private set; }
+
+    /// <summary>
+    /// A secret mission can only win the game once every player has had a turn, so the starting
+    /// player cannot win on their first turn just by completing a continent they almost own.
+    /// </summary>
+    public bool IsMissionVictoryAllowed => Round > 1;
+
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? StartedAt { get; private set; }
     public DateTimeOffset? TurnStartedAt { get; private set; }
@@ -203,6 +215,7 @@ public sealed class Game
         firstPlayer.AddReinforcements(CalculateReinforcements(firstPlayer.Id, map));
         CurrentPlayerId = firstPlayer.Id;
         CurrentPhase = GamePhase.Deployment;
+        Round = 1;
         State = GameState.InProgress;
         StartedAt = DateTimeOffset.UtcNow;
         TurnStartedAt = StartedAt;
@@ -361,6 +374,10 @@ public sealed class Game
         var next = current is null
             ? activePlayers[0]
             : activePlayers.FirstOrDefault(player => player.TurnOrder > current.TurnOrder) ?? activePlayers[0];
+
+        // Wrapping around to the start of the turn order begins a new round.
+        if (current is null || next.TurnOrder <= current.TurnOrder)
+            Round++;
 
         next.AddReinforcements(CalculateReinforcements(next.Id, map));
         HasConqueredTerritoryThisTurn = false;

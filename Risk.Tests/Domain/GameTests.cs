@@ -184,6 +184,37 @@ public class GameTests
     }
 
     [Fact]
+    public void Round_advances_when_every_player_has_had_a_turn_and_only_then_allows_mission_victory()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        Assert.Equal(0, game.Round);
+
+        game.Start(Map, new Random(1));
+        Assert.Equal(1, game.Round);
+        Assert.False(game.IsMissionVictoryAllowed);
+
+        PlayTurn(game, red);
+        Assert.Equal(blue.Id, game.CurrentPlayerId);
+        Assert.Equal(1, game.Round);
+        Assert.False(game.IsMissionVictoryAllowed);
+
+        PlayTurn(game, blue);
+        Assert.Equal(red.Id, game.CurrentPlayerId);
+        Assert.Equal(2, game.Round);
+        Assert.True(game.IsMissionVictoryAllowed);
+
+        static void PlayTurn(Game game, Player player)
+        {
+            var territory = game.Territories.First(t => t.OwnerId == player.Id);
+            game.DeployTroops(player.Id, territory, player.ReinforcementTroops);
+            game.EndPhase(player.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
+            game.EndPhase(player.Id, GamePhase.Deployment, Map, DateTimeOffset.UtcNow);
+        }
+    }
+
+    [Fact]
     public void Starting_a_new_turn_adds_territory_based_reinforcements()
     {
         var game = new Game(Host);

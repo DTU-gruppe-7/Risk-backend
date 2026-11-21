@@ -93,12 +93,20 @@ public sealed class ConquestResolver(
     private async Task EvaluateVictoryAsync(
         Game game, Guid playerId, CancellationToken cancellationToken)
     {
-        if (game.Settings?.HasMissions != true)
+        // Taking the whole board always wins, also with missions on and in the first round.
+        if (game.ControlsAllTerritories(playerId))
         {
-            if (game.ControlsAllTerritories(playerId))
-                game.FinishWithWinner(playerId);
+            game.FinishWithWinner(playerId);
             return;
         }
+
+        if (game.Settings?.HasMissions != true)
+            return;
+
+        // No mission victory in the first round; a mission that is still fulfilled later wins
+        // at the player's next conquest, or when they complete it via MissionCardService.
+        if (!game.IsMissionVictoryAllowed)
+            return;
 
         var mission = await missionCards.GetByPlayerIdAsync(game.Id, playerId, cancellationToken);
         if (mission is null || mission.IsCompleted)

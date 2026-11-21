@@ -32,19 +32,20 @@ public sealed record GameSummaryResponse(
 /// <param name="StartedAt">When the game started (null if not yet started).</param>
 /// <param name="EndedAt">When the game ended (null if not finished).</param>
 /// <param name="TurnStartedAt">When the current player's turn started.</param>
+/// <param name="Round">Current round, starting at 1 (0 in the Lobby). Secret missions cannot win the game in round 1.</param>
 public sealed record GameDetailResponse(
     Guid Id, long Version, Guid HostId, GameState State, Guid? WinnerId,
     Guid? CurrentPlayerId, GamePhase CurrentPhase,
     GameSettingResponse? Settings,
     IEnumerable<PlayerSummaryResponse> Players,
     DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt,
-    DateTimeOffset? TurnStartedAt)
+    DateTimeOffset? TurnStartedAt, int Round)
 {
     internal static GameDetailResponse From(Game g) =>
         new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
             g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
-            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt, g.Round);
 
     internal static GameDetailResponse From(Game g, Guid? viewerPlayerId) =>
         new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
@@ -52,7 +53,7 @@ public sealed record GameDetailResponse(
             g.Players.OrderBy(p => p.TurnOrder)
                 .Select(p => PlayerSummaryResponse.From(p, viewerPlayerId))
                 .ToList(),
-            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt, g.Round);
 }
 
 /// <summary>
