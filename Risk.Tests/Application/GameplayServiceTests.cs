@@ -339,10 +339,10 @@ public class GameplayServiceTests
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             guard.EnsureCompletedAsync(f.Game, f.Red.Id));
 
-        var troops = f.Game.TradeBonusCards(f.Red.Id, [.. redCards, blueCards[0]]);
+        var trade = f.Game.TradeBonusCards(f.Red.Id, [.. redCards, blueCards[0]]);
         await guard.EnsureCompletedAsync(f.Game, f.Red.Id);
         Assert.Equal(2, await HandSizeAsync(f, f.Red));
-        Assert.True(troops > 0);
+        Assert.True(trade.ReserveTroops > 0);
 
         // The new troops go wherever the player wants, and then the attack phase opens again.
         var anywhere = f.Game.Territories.First(t => t.OwnerId == f.Red.Id && t.Id != f.From.Id);

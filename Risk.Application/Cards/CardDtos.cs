@@ -21,9 +21,15 @@ public sealed record BonusCardResponse(
 /// <param name="PlayerId">Player receiving the card.</param>
 public sealed record AssignCardRequest(Guid PlayerId);
 
+/// <summary>Three cards to trade.</summary>
+/// <param name="CardIds">If several cards show territories the player owns, the territory bonus goes to the first of them in this order.</param>
 public sealed record TradeCardsRequest(IReadOnlyList<Guid> CardIds);
 
-public sealed record TradeCardsResponse(int TroopsAwarded);
+/// <summary>What a card trade gave the player.</summary>
+/// <param name="TroopsAwarded">The set's value, added to the reserve. Does not include the territory bonus.</param>
+/// <param name="BonusTerritoryId">Territory state id that got the territory bonus, or null when none was given.</param>
+/// <param name="BonusTroops">Troops placed directly on that territory (2, or 0 when none).</param>
+public sealed record TradeCardsResponse(int TroopsAwarded, Guid? BonusTerritoryId = null, int BonusTroops = 0);
 
 /// <summary>A mission card.</summary>
 /// <param name="Id">Card ID.</param>

@@ -3361,6 +3361,9 @@
       "BonusCardType": {
         "type": "integer"
       },
+      "CardTradeMode": {
+        "type": "integer"
+      },
       "ConquestRequest": {
         "required": [
           "fromTerritoryId",
@@ -3452,6 +3455,16 @@
               },
               {
                 "$ref": "#/components/schemas/GameVictoryMode"
+              }
+            ]
+          },
+          "cardTradeMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardTradeMode"
               }
             ]
           }
@@ -3609,7 +3622,8 @@
           "hasFogOfWar",
           "hasMissions",
           "victoryMode",
-          "blizzardCount"
+          "blizzardCount",
+          "cardTradeMode"
         ],
         "type": "object",
         "properties": {
@@ -3661,6 +3675,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "cardTradeMode": {
+            "$ref": "#/components/schemas/CardTradeMode"
           }
         }
       },
@@ -4115,6 +4132,22 @@
               "string"
             ],
             "format": "int32"
+          },
+          "bonusTerritoryId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "bonusTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -4174,6 +4207,16 @@
               },
               {
                 "$ref": "#/components/schemas/GameVictoryMode"
+              }
+            ]
+          },
+          "cardTradeMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardTradeMode"
               }
             ]
           }

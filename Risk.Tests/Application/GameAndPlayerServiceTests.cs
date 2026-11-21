@@ -56,6 +56,21 @@ public class GameAndPlayerServiceTests
     }
 
     [Fact]
+    public async Task The_card_trade_mode_is_chosen_at_creation_and_defaults_to_progressive()
+    {
+        var standard = await CreateGameAsync();
+        var fixedGame = await _gameService.CreateAsync(
+            new CreateGameRequest(4, null, null, null, null, CardTradeMode: CardTradeMode.Fixed));
+
+        Assert.Equal(CardTradeMode.Progressive, standard.Settings!.CardTradeMode);
+        Assert.Equal(CardTradeMode.Fixed, fixedGame.Settings!.CardTradeMode);
+
+        var updated = await _gameService.UpdateSettingsAsync(standard.Id,
+            new UpdateGameSettingRequest(4, 0, 0, false, false, CardTradeMode: CardTradeMode.Fixed));
+        Assert.Equal(CardTradeMode.Fixed, updated.CardTradeMode);
+    }
+
+    [Fact]
     public async Task Only_the_host_can_start_the_game()
     {
         var game = await CreateGameAsync();

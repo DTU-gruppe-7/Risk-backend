@@ -42,13 +42,17 @@ public sealed class BonusCardService(
             throw new DomainValidationException("Exactly three different cards must be traded.");
 
         var hand = await cards.GetByPlayerIdAsync(gameId, player.Id, ct);
-        var selected = hand.Where(card => request.CardIds.Contains(card.Id)).ToList();
+        // Kept in request order: it decides which card's territory gets the territory bonus.
+        var selected = request.CardIds
+            .Select(id => hand.FirstOrDefault(card => card.Id == id))
+            .OfType<BonusCard>()
+            .ToList();
         if (selected.Count != 3)
             throw new ForbiddenException("All selected cards must belong to your hand.");
 
-        var troops = game.TradeBonusCards(player.Id, selected);
+        var result = game.TradeBonusCards(player.Id, selected);
         await unitOfWork.SaveChangesAsync(ct);
-        return new TradeCardsResponse(troops);
+        return new TradeCardsResponse(result.ReserveTroops, result.BonusTerritoryId, result.BonusTroops);
     }
 
     private async Task<BonusCardResponse> ChangeAsync(Guid gameId, Guid id, Action<BonusCard> change, CancellationToken ct)

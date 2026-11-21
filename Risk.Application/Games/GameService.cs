@@ -46,7 +46,8 @@ public sealed class GameService(
             hasFogOfWar:   request.HasFogOfWar ?? false,
             hasMissions:   request.HasMissions ?? false,
             blizzardCount: request.BlizzardCount ?? 0,
-            victoryMode:   request.VictoryMode);
+            victoryMode:   request.VictoryMode,
+            cardTradeMode: request.CardTradeMode);
 
         games.Add(game);
         await unitOfWork.SaveChangesAsync(ct);
@@ -113,7 +114,8 @@ public sealed class GameService(
     {
         var game = await access.RequireHostAsync(id, ct);
         game.ConfigureSettings(request.MaxPlayers, request.Timer, request.TurnTimeLimit,
-            request.HasFogOfWar, request.HasMissions, request.BlizzardCount, request.VictoryMode);
+            request.HasFogOfWar, request.HasMissions, request.BlizzardCount, request.VictoryMode,
+            request.CardTradeMode);
 
         await unitOfWork.SaveChangesAsync(ct);
         return GameSettingResponse.From(game.Settings!);

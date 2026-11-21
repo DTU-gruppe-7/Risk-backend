@@ -37,6 +37,9 @@ public sealed class Game
     public DateTimeOffset? TurnStartedAt { get; private set; }
     public DateTimeOffset? EndedAt { get; private set; }
     public bool HasConqueredTerritoryThisTurn { get; private set; }
+
+    /// <summary>The territory bonus for traded cards is given at most once per turn (official rule).</summary>
+    public bool HasReceivedTerritoryBonusThisTurn { get; private set; }
     public int BonusCardTradeCount { get; private set; }
     public Guid? PendingConquestFromTerritoryId { get; private set; }
     public Guid? PendingConquestToTerritoryId { get; private set; }
@@ -81,7 +84,7 @@ public sealed class Game
     // -------------------------------------------------------------------------
 
     public void ConfigureSettings(int maxPlayers, int timer, int turnTimeLimit, bool hasFogOfWar, bool hasMissions,
-        int blizzardCount = 0, GameVictoryMode? victoryMode = null)
+        int blizzardCount = 0, GameVictoryMode? victoryMode = null, CardTradeMode? cardTradeMode = null)
     {
         EnsureState(GameState.Lobby, "Settings can only be changed while the game is in the Lobby.");
         if (maxPlayers < _players.Count)
@@ -89,10 +92,10 @@ public sealed class Game
 
         if (Settings is null)
             Settings = new GameSetting(Id, maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions,
-                blizzardCount, victoryMode);
+                blizzardCount, victoryMode, cardTradeMode);
         else
             Settings.Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions,
-                blizzardCount, victoryMode);
+                blizzardCount, victoryMode, cardTradeMode);
 
         BumpVersion();
     }
@@ -233,52 +236,52 @@ public sealed class Game
         _territories.Where(territory => !territory.IsBlizzard)
             .All(territory => territory.OwnerId == playerId);
 
-    public int TradeBonusCards(Guid playerId, IReadOnlyList<BonusCard> cards)
+    /// <summary>
+    /// Trades three cards. The set's value (by the game's <see cref="CardTradeMode"/>) goes to the
+    /// player's reserve. If a card shows a territory the player owns, 2 extra troops are placed
+    /// directly on it, at most once per turn (official rule). With several matches, the first card in
+    /// <paramref name="cards"/> wins, so the caller decides by the order it passes them in.
+    /// </summary>
+    public CardTradeResult TradeBonusCards(Guid playerId, IReadOnlyList<BonusCard> cards)
     {
         EnsureState(GameState.InProgress, "Cards can only be traded while the game is in progress.");
         if (CurrentPlayerId != playerId || CurrentPhase != GamePhase.Deployment)
             throw new BusinessRuleException("Cards can only be traded during the current player's Deployment phase.");
         if (cards.Count != 3 || cards.Any(card => card.PlayerId != playerId || card.Used))
             throw new BusinessRuleException("You must trade three unused cards from your own hand.");
-        if (!IsValidTrade(cards))
+        if (!CardTradeRules.IsValidSet(cards))
             throw new BusinessRuleException("The selected cards do not form a valid combination.");
 
         var player = RequirePlayer(playerId);
-        var matchingTerritoryBonus = cards.Count(card =>
-            card.TerritoryIdentifier is not null &&
-            _territories.Any(territory =>
-                territory.OwnerId == playerId &&
-                territory.Identifier == card.TerritoryIdentifier));
-        var troops = TradeInValue(BonusCardTradeCount++) + matchingTerritoryBonus * 2;
+        var mode = Settings?.CardTradeMode ?? CardTradeMode.Progressive;
+        var troops = CardTradeRules.SetValue(mode, cards, BonusCardTradeCount);
+        if (mode == CardTradeMode.Progressive)
+            BonusCardTradeCount++;
+
+        var bonusTerritory = HasReceivedTerritoryBonusThisTurn
+            ? null
+            : cards
+                .Select(card => _territories.FirstOrDefault(territory =>
+                    card.TerritoryIdentifier is not null &&
+                    territory.Identifier == card.TerritoryIdentifier &&
+                    territory.OwnerId == playerId))
+                .FirstOrDefault(territory => territory is not null);
 
         foreach (var card in cards)
             card.MarkAsUsed();
         player.AddTradeInReinforcements(troops);
-        BumpVersion();
-        return troops;
-    }
-
-    private static bool IsValidTrade(IReadOnlyList<BonusCard> cards)
-    {
-        var nonWild = cards.Where(card => card.Type != BonusCardType.Wild).ToList();
-        var hasWild = nonWild.Count != cards.Count;
-        var threeOfAKind = nonWild.Count == 3 && nonWild.Select(card => card.Type).Distinct().Count() == 1;
-        var oneOfEach = nonWild.Count == 3 &&
-                        nonWild.Select(card => card.Type).Distinct().Count() == 3;
-        return hasWild || threeOfAKind || oneOfEach;
-    }
-
-    private static int TradeInValue(int tradeNumber) =>
-        tradeNumber switch
+        if (bonusTerritory is not null)
         {
-            0 => 4,
-            1 => 6,
-            2 => 8,
-            3 => 10,
-            4 => 12,
-            5 => 15,
-            _ => 15 + (tradeNumber - 5) * 5
-        };
+            bonusTerritory.AddTroops(CardTradeRules.TerritoryBonusTroops);
+            HasReceivedTerritoryBonusThisTurn = true;
+        }
+
+        BumpVersion();
+        return new CardTradeResult(
+            troops,
+            bonusTerritory?.Id,
+            bonusTerritory is null ? 0 : CardTradeRules.TerritoryBonusTroops);
+    }
 
     public void EndPhase(Guid playerId, GamePhase expectedNextPhase, MapGraph map, DateTimeOffset now)
     {
@@ -361,6 +364,7 @@ public sealed class Game
 
         next.AddReinforcements(CalculateReinforcements(next.Id, map));
         HasConqueredTerritoryThisTurn = false;
+        HasReceivedTerritoryBonusThisTurn = false;
         CurrentPlayerId = next.Id;
         CurrentPhase = GamePhase.Deployment;
         TurnStartedAt = now;
