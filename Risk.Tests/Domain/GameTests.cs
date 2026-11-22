@@ -195,23 +195,15 @@ public class GameTests
         Assert.Equal(1, game.Round);
         Assert.False(game.IsMissionVictoryAllowed);
 
-        PlayTurn(game, red);
+        game.PlayTurn(red);
         Assert.Equal(blue.Id, game.CurrentPlayerId);
         Assert.Equal(1, game.Round);
         Assert.False(game.IsMissionVictoryAllowed);
 
-        PlayTurn(game, blue);
+        game.PlayTurn(blue);
         Assert.Equal(red.Id, game.CurrentPlayerId);
         Assert.Equal(2, game.Round);
         Assert.True(game.IsMissionVictoryAllowed);
-
-        static void PlayTurn(Game game, Player player)
-        {
-            var territory = game.Territories.First(t => t.OwnerId == player.Id);
-            game.DeployTroops(player.Id, territory, player.ReinforcementTroops);
-            game.EndPhase(player.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
-            game.EndPhase(player.Id, GamePhase.Deployment, Map, DateTimeOffset.UtcNow);
-        }
     }
 
     [Fact]
@@ -254,10 +246,34 @@ public class GameTests
         game.Start(Map, new Random(1));
         var turnStarted = game.TurnStartedAt!.Value;
 
-        Assert.True(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10)));
+        Assert.True(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10), new Random(1)));
         Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
         Assert.NotEqual(red.Id, game.CurrentPlayerId);
-        Assert.False(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10)));
+        Assert.False(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10), new Random(1)));
+    }
+
+    [Fact]
+    public void A_timed_out_turn_places_undeployed_troops_on_the_players_territories()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.ConfigureSettings(6, 0, 10, false, false);
+        game.Start(Map, new Random(1));
+        var reserve = red.ReinforcementTroops;
+        var troopsOnBoard = game.Territories.Where(t => t.OwnerId == red.Id).Sum(t => t.TroopCount);
+        Assert.True(reserve > 0);
+
+        game.AdvanceIfTurnTimedOut(Map, game.TurnStartedAt!.Value.AddSeconds(10), new Random(1));
+
+        Assert.Equal(0, red.ReinforcementTroops);
+        Assert.Equal(troopsOnBoard + reserve, game.Territories.Where(t => t.OwnerId == red.Id).Sum(t => t.TroopCount));
+
+        // Next turn red gets only the normal reinforcements, nothing saved up from the timed-out turn.
+        game.PlayTurn(blue);
+        var expected = Math.Max(3, game.Territories.Count(t => t.OwnerId == red.Id) / 3)
+                       + game.BoardOn(Map).ContinentBonusFor(red.Id);
+        Assert.Equal(expected, red.ReinforcementTroops);
     }
 
     [Fact]

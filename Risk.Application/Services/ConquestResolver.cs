@@ -103,17 +103,12 @@ public sealed class ConquestResolver(
         if (game.Settings?.HasMissions != true)
             return;
 
-        // No mission victory in the first round; a mission that is still fulfilled later wins
-        // at the player's next conquest, or when they complete it via MissionCardService.
-        if (!game.IsMissionVictoryAllowed)
-            return;
-
         var mission = await missionCards.GetByPlayerIdAsync(game.Id, playerId, cancellationToken);
-        if (mission is null || mission.IsCompleted)
+        if (mission is null)
             return;
 
         var map = await mapRepository.GetGraphAsync(cancellationToken);
-        if (!mission.IsSatisfiedBy(game, map, playerId))
+        if (!mission.CanBeCompleted(game, map))
             return;
 
         mission.Complete(game, map);

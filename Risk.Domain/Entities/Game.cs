@@ -201,13 +201,7 @@ public sealed class Game
             var ownedTerritories = playableTerritories
                 .Where(t => t.OwnerId == player.Id)
                 .ToList();
-            var remainingTroops = startingTroops - ownedTerritories.Count;
-
-            for (var troop = 0; troop < remainingTroops; troop++)
-            {
-                var territory = ownedTerritories[random.Next(ownedTerritories.Count)];
-                territory.AddTroops(1);
-            }
+            PlaceRandomly(ownedTerritories, startingTroops - ownedTerritories.Count, random);
         }
 
         // 5. Start første spillers normale tur med reinforcement deployment.
@@ -339,16 +333,45 @@ public sealed class Game
     /// <summary>
     /// Ends a timed-out turn. A pending conquest must be completed first
     /// (<see cref="CompletePendingConquestWithMinimumTroops"/>), so no territory is left with 0 troops.
+    /// Troops the player did not deploy are placed at random on their territories, so they are
+    /// neither lost nor saved up for a later turn.
     /// </summary>
-    public bool AdvanceIfTurnTimedOut(MapGraph map, DateTimeOffset now)
+    /// <param name="random">Decides where undeployed troops are placed.</param>
+    public bool AdvanceIfTurnTimedOut(MapGraph map, DateTimeOffset now, Random random)
     {
         EnsureState(GameState.InProgress, "A turn can only time out while the game is in progress.");
         if (!IsTurnTimedOut(now))
             return false;
 
         EnsureNoPendingConquest();
+        DeployRemainingReserveRandomly(random);
         AdvanceTurn(map, now);
         return true;
+    }
+
+    private void DeployRemainingReserveRandomly(Random random)
+    {
+        if (CurrentPlayerId is not { } playerId)
+            return;
+
+        var player = RequirePlayer(playerId);
+        var troops = player.ReinforcementTroops;
+        if (troops == 0)
+            return;
+
+        var owned = _territories.Where(territory => territory.OwnerId == playerId).ToList();
+        if (owned.Count == 0)
+            return;
+
+        player.PlaceTroops(troops);
+        PlaceRandomly(owned, troops, random);
+    }
+
+    /// <summary>Adds <paramref name="troops"/> one at a time to randomly chosen territories.</summary>
+    private static void PlaceRandomly(IReadOnlyList<Territory> territories, int troops, Random random)
+    {
+        for (var troop = 0; troop < troops; troop++)
+            territories[random.Next(territories.Count)].AddTroops(1);
     }
 
     private GamePhase NextPhase() => CurrentPhase switch

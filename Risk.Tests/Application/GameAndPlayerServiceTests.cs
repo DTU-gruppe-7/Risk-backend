@@ -38,8 +38,7 @@ public class GameAndPlayerServiceTests
             new FakeMissionCardRepository(),
             _unitOfWork,
             _currentUser,
-            access,
-            fogOfWar);
+            access);
     }
 
     private async Task<GameDetailResponse> CreateGameAsync() =>

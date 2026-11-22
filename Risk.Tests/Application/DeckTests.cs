@@ -81,6 +81,18 @@ public class DeckTests
     }
 
     [Fact]
+    public void Mission_cards_are_written_in_danish_with_the_continent_name()
+    {
+        var game = GameWith(1, hasMissions: true);
+
+        var mission = Assert.Single(MissionDeck.CreateFor(game, Territories));
+
+        Assert.Equal("africa", mission.TargetIdentifier);
+        Assert.Equal("Erobr Afrika", mission.Title);
+        Assert.Equal("Kontrollér alle territorier i Afrika.", mission.Description);
+    }
+
+    [Fact]
     public void A_map_without_territories_gives_no_missions()
     {
         var game = GameWith(2, hasMissions: true);

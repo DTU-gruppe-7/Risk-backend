@@ -44,8 +44,6 @@ public sealed class MissionCardService(
             throw new BusinessRuleException("A mission can only be completed while the game is in progress.");
         if (game.Settings?.HasMissions != true)
             throw new BusinessRuleException("Mission victory is not enabled for this game.");
-        if (!game.IsMissionVictoryAllowed)
-            throw new BusinessRuleException("A mission cannot be completed before every player has had a turn.");
 
         var player = access.RequireCurrentPlayer(game);
         var map = await mapRepository.GetGraphAsync(ct);

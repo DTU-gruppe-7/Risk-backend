@@ -239,7 +239,7 @@ public class ConquestRulesTests
         s.Game.BeginPendingConquest(s.Red.Id, s.From, s.To);
 
         Assert.Throws<BusinessRuleException>(() =>
-            s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10)));
+            s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10), new Random(1)));
     }
 
     [Fact]
@@ -259,7 +259,7 @@ public class ConquestRulesTests
         var s = InAttackPhase(turnTimeLimit: 10);
         var fromBefore = s.From.TroopCount;
 
-        var advanced = s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10));
+        var advanced = s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10), new Random(1));
 
         Assert.True(advanced);
         Assert.Equal(fromBefore, s.From.TroopCount);

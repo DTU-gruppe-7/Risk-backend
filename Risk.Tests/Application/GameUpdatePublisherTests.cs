@@ -66,11 +66,11 @@ public class GameUpdatePublisherTests
         Assert.Equal(visible.Order(), red.Territories.Select(t => t.Identifier));
         Assert.True(red.Territories.Count < s.Game.Territories.Count);
 
-        // Own reinforcements are visible, other players' are hidden (same as REST).
-        Assert.Equal(s.Red.ReinforcementTroops, red.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
+        // Fog of war hides territories, not reinforcements: everyone sees every reserve (same as REST).
         Assert.True(s.Red.ReinforcementTroops > 0);
+        Assert.Equal(s.Red.ReinforcementTroops, red.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
         var blue = s.Realtime.ToUser.Single(u => u.UserId == s.BlueUser).Update;
-        Assert.Equal(0, blue.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
+        Assert.Equal(s.Red.ReinforcementTroops, blue.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class GameUpdatePublisherTests
 
         var host = s.Realtime.ToUser.Single(u => u.UserId == s.HostUser).Update;
         Assert.Empty(host.Territories);
-        Assert.All(host.Game.Players, p => Assert.Equal(0, p.ReinforcementTroops));
+        Assert.Equal(s.Red.ReinforcementTroops, host.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
     }
 
     [Fact]

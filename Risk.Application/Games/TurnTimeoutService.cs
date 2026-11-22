@@ -40,7 +40,7 @@ public sealed class TurnTimeoutService(
             if (game.CurrentPhase != GamePhase.Fortify && game.CurrentPlayerId is { } playerId)
                 await conquestResolver.AwardConquestCardAsync(game, playerId, cancellationToken);
 
-            if (game.AdvanceIfTurnTimedOut(graph, now))
+            if (game.AdvanceIfTurnTimedOut(graph, now, Random.Shared))
                 advanced++;
         }
 

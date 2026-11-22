@@ -1,6 +1,7 @@
 using Risk.Application.Services;
 using Risk.Domain.Entities;
 using Risk.Domain.Map;
+using Risk.Tests.Domain;
 
 namespace Risk.Tests.Application;
 
@@ -29,14 +30,6 @@ public class MissionVictoryTests
 
         var resolver = new ConquestResolver(new FakeBonusCardRepository(), missions, new FakeMapRepository());
         return new Setup(game, red, blue, green, resolver, mission);
-    }
-
-    private static void PlayTurn(Game game, Player player)
-    {
-        var territory = game.Territories.First(t => t.OwnerId == player.Id);
-        game.DeployTroops(player.Id, territory, player.ReinforcementTroops);
-        game.EndPhase(player.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
-        game.EndPhase(player.Id, GamePhase.Deployment, Map, DateTimeOffset.UtcNow);
     }
 
     /// <summary>Red, in its Attack phase, takes Blue's last territory (Blue's others go to Green).</summary>
@@ -70,9 +63,9 @@ public class MissionVictoryTests
     public async Task A_completed_mission_wins_once_every_player_has_had_a_turn()
     {
         var s = Create();
-        PlayTurn(s.Game, s.Red);
-        PlayTurn(s.Game, s.Blue);
-        PlayTurn(s.Game, s.Green);
+        s.Game.PlayTurn(s.Red);
+        s.Game.PlayTurn(s.Blue);
+        s.Game.PlayTurn(s.Green);
         Assert.Equal(2, s.Game.Round);
 
         await EliminateBlueAsync(s);

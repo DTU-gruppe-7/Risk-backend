@@ -134,9 +134,6 @@ public sealed class GameService(
         return ToResponse(game);
     }
 
-    private GameDetailResponse ToResponse(Game game) =>
-        fogOfWar.IsActive(game)
-            ? GameDetailResponse.From(game, fogOfWar.ViewerPlayerId(game))
-            : GameDetailResponse.From(game);
+    private static GameDetailResponse ToResponse(Game game) => GameDetailResponse.From(game);
 
 }

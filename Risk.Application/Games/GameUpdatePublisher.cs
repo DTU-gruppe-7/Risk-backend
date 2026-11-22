@@ -60,13 +60,12 @@ public sealed class GameUpdatePublisher(
                 GameDetailResponse.From(game),
                 territories.Select(TerritoryResponse.From).ToList());
 
-        var viewerPlayerId = game.Players.FirstOrDefault(player => player.UserId == viewerUserId)?.Id;
         var visible = viewerUserId is { } userId
             ? FogOfWar.VisibleTerritoriesForUser(game, graph, userId)!
             : new HashSet<string>();
 
         return new GameUpdateMessage(
-            GameDetailResponse.From(game, viewerPlayerId),
+            GameDetailResponse.From(game),
             territories
                 .Where(territory => visible.Contains(territory.Identifier))
                 .Select(TerritoryResponse.From)
