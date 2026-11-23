@@ -18,6 +18,7 @@ using Risk.Infrastructure.Persistence;
 using Microsoft.Extensions.Options;
 using Risk.Api.Controllers;
 using System.Threading.RateLimiting;
+using OpenTelemetry.Metrics;
 
 var builder = WebApplication.CreateBuilder(args);
 var isDesignTime = Assembly.GetEntryAssembly() != Assembly.GetExecutingAssembly();
@@ -141,6 +142,21 @@ builder.Services.AddRateLimiter(options =>
         );
     };
 });
+
+// Metrics sendes med OTLP til Prometheus på serveren. Lokalt og i testene er OTEL_EXPORTER_OTLP_ENDPOINT
+// ikke sat, og så registreres intet. Adresse, protokol, servicenavn og miljø kommer fra OTEL_*-variablerne.
+if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+{
+    builder.Services.AddOpenTelemetry().WithMetrics(metrics => metrics
+        .AddMeter(
+            "Microsoft.AspNetCore.Hosting",          // requests, svartider og statuskoder
+            "Microsoft.AspNetCore.Server.Kestrel",   // forbindelser
+            "Microsoft.AspNetCore.Http.Connections", // SignalR-forbindelser
+            "Microsoft.AspNetCore.RateLimiting",     // afviste forsøg på login og registrering
+            "System.Runtime",                        // hukommelse, GC og tråde
+            AuthMetrics.MeterName)                   // loginforsøg fordelt på resultat
+        .AddOtlpExporter());
+}
 
 // Både "dotnet build" (OpenAPI-generering), "dotnet ef" og migration bundles bygger
 // host'en uden at starte den. Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
