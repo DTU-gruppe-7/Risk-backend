@@ -46,6 +46,7 @@ public static class DependencyInjection
         // OWASP: mindst 210.000 iterationer for PBKDF2-HMAC-SHA512, som Identity bruger. Standarden er 100.000.
         services.Configure<PasswordHasherOptions>(options => options.IterationCount = 210_000);
         services.AddScoped<IIdentityService, IdentityService>();
+        services.AddSingleton<AuthMetrics>();
 
         // DataProtection-nøgler i databasen, så de overlever deploys og virker med read-only containere
         services.AddDataProtection()

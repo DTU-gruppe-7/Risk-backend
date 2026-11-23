@@ -7,7 +7,10 @@ using Risk.Application.Interfaces;
 namespace Risk.Infrastructure.Identity;
 
 /// <summary>Adapts ASP.NET Identity to <see cref="IIdentityService"/>.</summary>
-public sealed class IdentityService(UserManager<ApplicationUser> userManager, ILogger<IdentityService> logger) : IIdentityService
+public sealed class IdentityService(
+    UserManager<ApplicationUser> userManager,
+    ILogger<IdentityService> logger,
+    AuthMetrics metrics) : IIdentityService
 {
     public async Task CreateAccountAsync(Guid domainUserId, string email, string password,
         CancellationToken cancellationToken = default)
@@ -34,12 +37,16 @@ public sealed class IdentityService(UserManager<ApplicationUser> userManager, IL
         var account = await userManager.FindByEmailAsync(email);
         if (account is null)
         {
-            logger.LogWarning("Login failed: unknown email");
+            logger.LogWarning("Login failed: unknown email.");
+            metrics.LoginAttempt("unknown_email");
             return null;
         }
+
+        // Samme svar som ved forkert password, så svaret ikke afslører, at kontoen er låst.
         if (await userManager.IsLockedOutAsync(account))
         {
             logger.LogWarning("Login rejected: account {UserId} is locked.", account.DomainUserId);
+            metrics.LoginAttempt("locked_out");
             return null;
         }
 
@@ -47,9 +54,12 @@ public sealed class IdentityService(UserManager<ApplicationUser> userManager, IL
         {
             await userManager.AccessFailedAsync(account);
             logger.LogWarning("Login failed: wrong password for account {UserId}.", account.DomainUserId);
+            metrics.LoginAttempt("wrong_password");
             return null;
         }
+
         await userManager.ResetAccessFailedCountAsync(account);
+        metrics.LoginAttempt("success");
         var roles = await userManager.GetRolesAsync(account);
         return new AuthenticatedAccount(account.DomainUserId, roles.ToList());
     }

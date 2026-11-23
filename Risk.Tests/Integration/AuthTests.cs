@@ -1,6 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
+using Risk.Infrastructure.Identity;
 
 namespace Risk.Tests.Integration;
 
@@ -88,6 +92,23 @@ public sealed class AuthTests(ApiFixture api)
         for (var i = 0; i < 4; i++)
             await LoginAsync(user.Http, user.Email, "Wrong-Password-123");
         Assert.Equal(HttpStatusCode.OK, (await LoginAsync(user.Http, user.Email, ApiFixture.Password)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_attempts_are_counted_by_result()
+    {
+        var meterFactory = api.Services.GetRequiredService<IMeterFactory>();
+        using var collector = new MetricCollector<long>(meterFactory, AuthMetrics.MeterName, "risk.auth.login.attempts");
+        var user = await api.RegisterAsync("metrics");
+
+        await LoginAsync(user.Http, user.Email, "Wrong-Password-123");
+        await LoginAsync(user.Http, user.Email, ApiFixture.Password);
+        await LoginAsync(user.Http, "nobody@example.com", "Wrong-Password-123");
+
+        var results = collector.GetMeasurementSnapshot().Select(m => m.Tags["result"]).ToList();
+        Assert.Contains("wrong_password", results);
+        Assert.Contains("success", results);
+        Assert.Contains("unknown_email", results);
     }
 
     private static Task<HttpResponseMessage> LoginAsync(HttpClient client, string email, string password) =>
