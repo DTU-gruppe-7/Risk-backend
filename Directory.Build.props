@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Lås hele pakkegrafen, også transitive pakker, i packages.lock.json pr. projekt (L7). -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Migrator-bundlen restores til linux-x64 i Dockerfilen. Uden denne linje kender lockfilen
+         ikke de pakker, der afhænger af runtimen, og en låst restore fejler. -->
+    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+</Project>
