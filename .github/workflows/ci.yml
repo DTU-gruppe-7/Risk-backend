@@ -32,7 +32,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - run: dotnet tool restore
-      - run: dotnet restore Risk.slnx
+      - run: dotnet restore Risk.slnx --locked-mode
       - run: dotnet build Risk.slnx --no-restore -c Release
       # Testcontainers virker direkte på GitHubs Ubuntu-runners (Docker er installeret)
       - name: Test med coverage
