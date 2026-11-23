@@ -4,7 +4,7 @@
 # og så Dependabot kan finde og opdatere dem.
 
 # ---------- Build: restore + publish ----------
-FROM mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:bef136a371963aaa46ec97882845ef6f54dec15728bb4b128b1c2a400ffbc9b4 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:8c6edfb26c85153f236d26efebd9ad349aec403583f343f201ee67838b23658d AS build
 WORKDIR /src
 
 # Kun projektfiler og lockfiler først, så restore-laget caches, indtil afhængighederne ændres
