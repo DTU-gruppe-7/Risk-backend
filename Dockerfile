@@ -7,13 +7,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:bef136a371963aaa46ec97882845ef6f54dec15728bb4b128b1c2a400ffbc9b4 AS build
 WORKDIR /src
 
-# Kun projektfiler først, så restore-laget caches, indtil afhængighederne ændres
+# Kun projektfiler og lockfiler først, så restore-laget caches, indtil afhængighederne ændres
 COPY .config/dotnet-tools.json .config/
-COPY ["Risk.Api/Risk.Api.csproj", "Risk.Api/"]
-COPY ["Risk.Application/Risk.Application.csproj", "Risk.Application/"]
-COPY ["Risk.Domain/Risk.Domain.csproj", "Risk.Domain/"]
-COPY ["Risk.Infrastructure/Risk.Infrastructure.csproj", "Risk.Infrastructure/"]
-RUN dotnet tool restore && dotnet restore "Risk.Api/Risk.Api.csproj"
+COPY Directory.Build.props ./
+COPY ["Risk.Api/Risk.Api.csproj", "Risk.Api/packages.lock.json", "Risk.Api/"]
+COPY ["Risk.Application/Risk.Application.csproj", "Risk.Application/packages.lock.json", "Risk.Application/"]
+COPY ["Risk.Domain/Risk.Domain.csproj", "Risk.Domain/packages.lock.json", "Risk.Domain/"]
+COPY ["Risk.Infrastructure/Risk.Infrastructure.csproj", "Risk.Infrastructure/packages.lock.json", "Risk.Infrastructure/"]
+# --locked-mode: fejler, hvis en pakke ikke passer med lockfilen, i stedet for stille at hente en anden version
+RUN dotnet tool restore && dotnet restore "Risk.Api/Risk.Api.csproj" --locked-mode
 
 COPY . .
 RUN dotnet publish "Risk.Api/Risk.Api.csproj" -c Release --no-restore -o /app/publish /p:UseAppHost=false
@@ -21,7 +23,7 @@ RUN dotnet publish "Risk.Api/Risk.Api.csproj" -c Release --no-restore -o /app/pu
 # ---------- Migration bundle ----------
 FROM build AS bundle
 # Bundlen er self-contained og skal derfor have restore-assets for linux-x64
-RUN dotnet restore "Risk.Api/Risk.Api.csproj" --runtime linux-x64
+RUN dotnet restore "Risk.Api/Risk.Api.csproj" --runtime linux-x64 --locked-mode
 RUN dotnet ef migrations bundle \
       --project Risk.Infrastructure/Risk.Infrastructure.csproj \
       --startup-project Risk.Api/Risk.Api.csproj \

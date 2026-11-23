@@ -25,6 +25,7 @@ packages/
 *.snupkg
 [Tt]est[Rr]esult*/
 coverage/
+TestResults/
 *.coverage
 *.t
 

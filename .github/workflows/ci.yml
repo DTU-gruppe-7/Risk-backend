@@ -32,10 +32,19 @@ jobs:
           dotnet-version: 10.0.x
 
       - run: dotnet tool restore
-      - run: dotnet restore Risk.slnx
+      - run: dotnet restore Risk.slnx --locked-mode
       - run: dotnet build Risk.slnx --no-restore -c Release
       # Testcontainers virker direkte på GitHubs Ubuntu-runners (Docker er installeret)
-      - run: dotnet test Risk.slnx --no-build -c Release
+      - name: Test med coverage
+        run: >
+          dotnet test Risk.slnx --no-build -c Release
+          --collect "XPlat Code Coverage" --settings coverage.runsettings
+          --results-directory TestResults
+
+      - name: Coverage-rapport
+        run: |
+          dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:MarkdownSummaryGithub
+          cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Tjek for manglende migrationer
         run: >
@@ -43,8 +52,7 @@ jobs:
           --project Risk.Infrastructure --startup-project Risk.Api
           --configuration Release --no-build
 
-      - name: Kodestil (kun advarsel indtil videre)
-        continue-on-error: true
+      - name: Kodestil
         run: dotnet format Risk.slnx --verify-no-changes --no-restore
 
   smoke-test:
