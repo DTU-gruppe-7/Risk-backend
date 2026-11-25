@@ -334,6 +334,19 @@ public class GameTests
         Assert.Throws<BusinessRuleException>(() => game.AddPlayer(Guid.NewGuid(), "green"));
     }
 
+    [Theory]
+    [InlineData("red")]
+    [InlineData("RED")]
+    public void AddPlayer_rejects_a_color_that_is_already_taken(string color)
+    {
+        var game = new Game(Host);
+        game.AddPlayer(Guid.NewGuid(), "red");
+
+        var ex = Assert.Throws<BusinessRuleException>(() => game.AddPlayer(Guid.NewGuid(), color));
+        Assert.Contains("color", ex.Message);
+        Assert.Single(game.Players);
+    }
+
     [Fact]
     public void Lobby_actions_are_rejected_after_start()
     {

@@ -98,6 +98,8 @@ public sealed class Game
         EnsureState(GameState.Lobby, "The game has already started.");
         if (_players.Any(p => p.UserId == userId))
             throw new BusinessRuleException("You are already in this game.");
+        if (_players.Any(p => p.Color == color.ToLowerInvariant()))
+            throw new BusinessRuleException("A player has already picked this color.");
         if (_players.Count >= MaxPlayers)
             throw new BusinessRuleException("The game is full.");
 
