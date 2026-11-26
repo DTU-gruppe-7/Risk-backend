@@ -87,6 +87,57 @@ public class GameUpdatePublisherTests
         Assert.Equal(s.Red.ReinforcementTroops, host.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
     }
 
+    /// <summary>Red (first in turn) conquers a blue neighbour and has not moved troops in yet.</summary>
+    private static (Territory From, Territory To) BeginConquest(Setup s)
+    {
+        var from = s.Game.Territories.First(t =>
+            t.OwnerId == s.Red.Id &&
+            Map.NeighborsOf(t.Identifier).Any(n => s.Game.Territories.Single(o => o.Identifier == n).OwnerId == s.Blue.Id));
+        var to = s.Game.Territories.First(t =>
+            t.OwnerId == s.Blue.Id && Map.NeighborsOf(from.Identifier).Contains(t.Identifier));
+        s.Game.DeployTroops(s.Red.Id, from, s.Red.ReinforcementTroops);
+        to.RemoveTroops(to.TroopCount);
+        s.Game.BeginPendingConquest(s.Red.Id, from, to);
+        return (from, to);
+    }
+
+    [Fact]
+    public async Task Without_fog_the_pending_conquest_is_sent_to_everyone()
+    {
+        var s = Create(fog: false);
+        var (from, to) = BeginConquest(s);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        var pending = Assert.Single(s.Realtime.ToGame).Update.Game.PendingConquest;
+        Assert.Equal(new PendingConquestResponse(from.Id, to.Id, 1, from.TroopCount - 1), pending);
+    }
+
+    [Fact]
+    public async Task With_fog_the_pending_conquest_only_goes_to_those_who_see_both_territories()
+    {
+        var s = Create(fog: true);
+        var (from, to) = BeginConquest(s);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        PendingConquestResponse? For(Guid user) =>
+            s.Realtime.ToUser.Single(u => u.UserId == user).Update.Game.PendingConquest;
+        Assert.Equal(new PendingConquestResponse(from.Id, to.Id, 1, from.TroopCount - 1), For(s.RedUser));
+        Assert.NotNull(For(s.BlueUser));   // the defender sees their lost territory and its attacker
+        Assert.Null(For(s.HostUser));      // a host who only watches sees no territories under fog
+    }
+
+    [Fact]
+    public async Task There_is_no_pending_conquest_when_nothing_waits()
+    {
+        var s = Create(fog: false);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        Assert.Null(Assert.Single(s.Realtime.ToGame).Update.Game.PendingConquest);
+    }
+
     [Fact]
     public async Task A_host_who_plays_gets_one_update_not_two()
     {

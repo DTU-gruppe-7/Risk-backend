@@ -33,19 +33,49 @@ public sealed record GameSummaryResponse(
 /// <param name="EndedAt">When the game ended (null if not finished).</param>
 /// <param name="TurnStartedAt">When the current player's turn started.</param>
 /// <param name="Round">Current round, starting at 1 (0 in the Lobby). Secret missions cannot win the game in round 1.</param>
+/// <param name="PendingConquest">A conquered territory waiting for troops to move in, or null when nothing is pending.</param>
 public sealed record GameDetailResponse(
     Guid Id, long Version, Guid HostId, GameState State, Guid? WinnerId,
     Guid? CurrentPlayerId, GamePhase CurrentPhase,
     GameSettingResponse? Settings,
     IEnumerable<PlayerSummaryResponse> Players,
     DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt,
-    DateTimeOffset? TurnStartedAt, int Round)
+    DateTimeOffset? TurnStartedAt, int Round,
+    PendingConquestResponse? PendingConquest)
 {
-    internal static GameDetailResponse From(Game g) =>
+    /// <param name="g">The game.</param>
+    /// <param name="visibleTerritories">
+    /// The territories the receiver may see under fog of war, or null when the game has no fog.
+    /// </param>
+    internal static GameDetailResponse From(Game g, IReadOnlySet<string>? visibleTerritories) =>
         new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
             g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
-            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt, g.Round);
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt, g.Round,
+            PendingConquestResponse.For(g, visibleTerritories));
+}
+
+/// <summary>
+/// A conquered territory waiting for the attacker to move troops in (<c>POST …/gameplay/conquest</c>).
+/// Ids are territory state ids (<see cref="TerritoryResponse.Id"/>).
+/// </summary>
+/// <param name="FromTerritoryId">The territory that attacked.</param>
+/// <param name="ToTerritoryId">The conquered territory, waiting for troops.</param>
+/// <param name="MinTroops">The fewest troops that must move in.</param>
+/// <param name="MaxTroops">The most troops that may move in.</param>
+public sealed record PendingConquestResponse(Guid FromTerritoryId, Guid ToTerritoryId, int MinTroops, int MaxTroops)
+{
+    /// <summary>Null when nothing is pending, or under fog of war when the receiver cannot see both territories.</summary>
+    internal static PendingConquestResponse? For(Game game, IReadOnlySet<string>? visibleTerritories)
+    {
+        if (game.FindPendingConquest() is not { } pending)
+            return null;
+        if (visibleTerritories is not null &&
+            !(visibleTerritories.Contains(pending.From.Identifier) && visibleTerritories.Contains(pending.To.Identifier)))
+            return null;
+
+        return new PendingConquestResponse(pending.From.Id, pending.To.Id, pending.MinTroops, pending.MaxTroops);
+    }
 }
 
 /// <summary>

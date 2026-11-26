@@ -94,6 +94,42 @@ public class ConquestRulesTests
     }
 
     [Fact]
+    public void The_pending_conquest_names_both_territories_and_how_many_troops_may_move_in()
+    {
+        var s = InAttackPhase();
+        Assert.Null(s.Game.FindPendingConquest());
+
+        Defeat(s.To);
+        s.Game.BeginPendingConquest(s.Red.Id, s.From, s.To);
+
+        var pending = s.Game.FindPendingConquest();
+        Assert.NotNull(pending);
+        Assert.Same(s.From, pending.From);
+        Assert.Same(s.To, pending.To);
+        Assert.Equal(1, pending.MinTroops);
+        Assert.Equal(s.From.TroopCount - 1, pending.MaxTroops);
+    }
+
+    [Fact]
+    public void The_pending_conquest_limits_are_exactly_what_completing_accepts()
+    {
+        var s = InAttackPhase();
+        Defeat(s.To);
+        s.Game.BeginPendingConquest(s.Red.Id, s.From, s.To);
+        var pending = s.Game.FindPendingConquest()!;
+
+        Assert.Throws<BusinessRuleException>(() =>
+            s.Game.CompletePendingConquest(s.Red.Id, s.From, s.To, pending.MinTroops - 1));
+        Assert.Throws<BusinessRuleException>(() =>
+            s.Game.CompletePendingConquest(s.Red.Id, s.From, s.To, pending.MaxTroops + 1));
+
+        s.Game.CompletePendingConquest(s.Red.Id, s.From, s.To, pending.MaxTroops);
+
+        Assert.Equal(pending.MaxTroops, s.To.TroopCount);
+        Assert.Null(s.Game.FindPendingConquest());
+    }
+
+    [Fact]
     public void Completing_a_pending_conquest_moves_the_troops_and_clears_the_pending_state()
     {
         var s = InAttackPhase();

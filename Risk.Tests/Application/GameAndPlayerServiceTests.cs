@@ -128,6 +128,21 @@ public class GameAndPlayerServiceTests
     }
 
     [Fact]
+    public async Task Getting_the_game_includes_a_pending_conquest()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+        var from = game.Territories.First(t => t.OwnerId == player.Id);
+        from.AddTroops(3);
+        var to = game.Territories.First(t => t.OwnerId != player.Id && !t.IsBlizzard);
+        to.RemoveTroops(to.TroopCount);
+        game.BeginPendingConquest(player.Id, from, to);
+
+        var response = await _gameService.GetByIdAsync(game.Id);
+
+        Assert.Equal(new PendingConquestResponse(from.Id, to.Id, 1, from.TroopCount - 1), response.PendingConquest);
+    }
+
+    [Fact]
     public async Task Unknown_game_is_not_found()
     {
         await Assert.ThrowsAsync<NotFoundException>(() => _gameService.GetByIdAsync(Guid.NewGuid()));

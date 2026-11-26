@@ -17,6 +17,10 @@ public sealed class GameAccess(
     public async Task<Game> RequireGameAsync(Guid gameId, CancellationToken ct = default) =>
         await games.GetAsync(gameId, ct) ?? throw new NotFoundException("Game", gameId);
 
+    /// <summary>The game with its players and territories, for responses that need the board.</summary>
+    public async Task<Game> RequireGameWithDetailsAsync(Guid gameId, CancellationToken ct = default) =>
+        await games.GetByIdWithDetailsAsync(gameId, ct) ?? throw new NotFoundException("Game", gameId);
+
     public async Task EnsureGameExistsAsync(Guid gameId, CancellationToken ct = default)
     {
         if (!await games.ExistsAsync(gameId, ct))
@@ -41,8 +45,7 @@ public sealed class GameAccess(
 
     public async Task<Game> RequireParticipantWithDetailsAsync(Guid gameId, CancellationToken ct = default)
     {
-        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
-                   ?? throw new NotFoundException("Game", gameId);
+        var game = await RequireGameWithDetailsAsync(gameId, ct);
         if (!game.HasParticipant(currentUser.UserId))
             throw new ForbiddenException("You are not part of this game.");
         return game;
@@ -55,8 +58,7 @@ public sealed class GameAccess(
     public async Task<(Game Game, Player Player)> RequireCurrentTurnAsync(
         Guid gameId, Guid userId, CancellationToken ct = default)
     {
-        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
-                   ?? throw new NotFoundException("Game", gameId);
+        var game = await RequireGameWithDetailsAsync(gameId, ct);
         var player = game.FindPlayerByUser(userId)
                      ?? throw new ForbiddenException("You are not a player in this game.");
         if (player.IsEliminated)
@@ -82,8 +84,7 @@ public sealed class GameAccess(
 
     public async Task<Game> RequireHostWithDetailsAsync(Guid gameId, CancellationToken ct = default)
     {
-        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
-                   ?? throw new NotFoundException("Game", gameId);
+        var game = await RequireGameWithDetailsAsync(gameId, ct);
         if (!game.IsHost(currentUser.UserId))
             throw new ForbiddenException("Only the host can do this.");
         return game;

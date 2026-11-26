@@ -627,7 +627,8 @@ public class GameTests
         to.AddTroops(5);
         var (fromTroops, toTroops, version) = (from.TroopCount, to.TroopCount, game.Version);
 
-        game.ApplyBattleLosses(from, to, new BattleResult(1, 1, [6, 1], [6, 1]));
+        // 6 beats 5, 2 beats 1: each side loses one troop.
+        game.ApplyBattleLosses(from, to, BattleService.Fight([6, 1], [5, 2]));
 
         Assert.Equal(fromTroops - 1, from.TroopCount);
         Assert.Equal(toTroops - 1, to.TroopCount);
@@ -647,6 +648,6 @@ public class GameTests
         other.StartInJoinOrder(Map);
 
         Assert.Throws<BusinessRuleException>(() => game.ApplyBattleLosses(
-            game.Territories.First(), other.Territories.First(), new BattleResult(1, 0, [1], [6])));
+            game.Territories.First(), other.Territories.First(), BattleService.Fight([1], [6])));
     }
 }

@@ -25,16 +25,10 @@ public sealed class GameplayService(
         var context = await ValidateAttackPrerequisitesAsync(
             dto.GameId, dto.FromTerritoryId, dto.ToTerritoryId, cancellationToken);
 
-        if (dto.AttackingTroopsCount is < 1 or > 3)
+        if (dto.AttackingTroopsCount is < 1 or > BattleService.MaxAttackerDice)
             throw new DomainValidationException("Must attack with 1, 2, or 3 troops.");
         if (dto.AttackingTroopsCount >= context.From.TroopCount)
             throw new BusinessRuleException("Originating territory must retain at least 1 troop.");
-        if (dto.DefendingTroopsCount is < 1 or > 2 ||
-            dto.DefendingTroopsCount > context.To.TroopCount)
-        {
-            throw new DomainValidationException(
-                "The defender must choose 1 or 2 troops, up to the number stationed in the territory.");
-        }
 
         // Validated before rolling: a conquest only happens when the attacker loses no troops,
         // so the origin's troop count is already final here. Rejecting after the roll would
@@ -49,7 +43,7 @@ public sealed class GameplayService(
         }
 
         var attackerDice = diceRoller.Roll(dto.AttackingTroopsCount);
-        var defenderDice = diceRoller.Roll(dto.DefendingTroopsCount);
+        var defenderDice = diceRoller.Roll(BattleService.DefenderDiceFor(context.To.TroopCount));
         var battle = BattleService.Fight(attackerDice, defenderDice);
 
         context.Game.ApplyBattleLosses(context.From, context.To, battle);
@@ -77,6 +71,7 @@ public sealed class GameplayService(
             DefenderLosses: battle.DefenderLosses,
             AttackerDice: battle.SortedAttackerDice,
             DefenderDice: battle.SortedDefenderDice,
+            Comparisons: DiceComparisonDto.From(battle),
             TerritoryConquered: conquered,
             TroopsMoved: troopsMoved);
     }
@@ -97,8 +92,8 @@ public sealed class GameplayService(
 
         while (context.From.TroopCount > 1 && context.To.TroopCount > 0)
         {
-            var attackerDice = diceRoller.Roll(Math.Min(3, context.From.TroopCount - 1));
-            var defenderDice = diceRoller.Roll(Math.Min(2, context.To.TroopCount));
+            var attackerDice = diceRoller.Roll(BattleService.AttackerDiceFor(context.From.TroopCount));
+            var defenderDice = diceRoller.Roll(BattleService.DefenderDiceFor(context.To.TroopCount));
             var battle = BattleService.Fight(attackerDice, defenderDice);
 
             context.Game.ApplyBattleLosses(context.From, context.To, battle);
@@ -108,7 +103,8 @@ public sealed class GameplayService(
                 AttackerDice: battle.SortedAttackerDice,
                 DefenderDice: battle.SortedDefenderDice,
                 AttackerLosses: battle.AttackerLosses,
-                DefenderLosses: battle.DefenderLosses));
+                DefenderLosses: battle.DefenderLosses,
+                Comparisons: DiceComparisonDto.From(battle)));
         }
 
         var conquered = context.To.TroopCount == 0;

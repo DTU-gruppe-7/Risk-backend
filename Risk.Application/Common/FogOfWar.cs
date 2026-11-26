@@ -33,6 +33,21 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
     }
 
     /// <summary>
+    /// The territories the current user can see, or null when the game has no fog of war. Unlike
+    /// <see cref="VisibleTerritoriesAsync"/> a host who only watches is not refused: they see none.
+    /// For filtering responses that every participant may fetch.
+    /// </summary>
+    public async Task<IReadOnlySet<string>?> VisibleToCurrentUserAsync(
+        Game game, CancellationToken cancellationToken = default)
+    {
+        if (!IsActive(game))
+            return null;
+
+        var graph = await mapRepository.GetGraphAsync(cancellationToken);
+        return VisibleTerritoriesForUser(game, graph, currentUser.UserId);
+    }
+
+    /// <summary>
     /// The territories a given player can see, or null when the game has no fog of war.
     /// Takes the viewer explicitly, for callers without a current user (realtime pushes).
     /// </summary>

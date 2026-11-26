@@ -6,6 +6,56 @@ namespace Risk.Tests.Risk.UnitTests.Domain;
 
 public class BattleServiceTests
 {
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(5, 2)]
+    public void The_defender_rolls_two_dice_or_one_with_a_single_troop(int troops, int expected) =>
+        BattleService.DefenderDiceFor(troops).Should().Be(expected);
+
+    [Theory]
+    [InlineData(2, 1)]
+    [InlineData(3, 2)]
+    [InlineData(4, 3)]
+    [InlineData(10, 3)]
+    public void The_attacker_rolls_up_to_three_dice_and_leaves_one_troop_behind(int troops, int expected) =>
+        BattleService.AttackerDiceFor(troops).Should().Be(expected);
+
+    [Fact]
+    public void Fight_ThreeAgainstTwo_ComparesTheTwoHighestPairsInOrder()
+    {
+        var result = BattleService.Fight(new[] { 2, 6, 5 }, new[] { 2, 6 });
+
+        result.Comparisons.Should().Equal(
+            new DiceComparison(6, 6, BattleSide.Defender),
+            new DiceComparison(5, 2, BattleSide.Attacker));
+        // The attacker's third die (2) has no pair, but is still rolled.
+        result.SortedAttackerDice.Should().Equal(6, 5, 2);
+    }
+
+    [Fact]
+    public void Fight_ATie_IsWonByTheDefender()
+    {
+        var result = BattleService.Fight(new[] { 4 }, new[] { 4 });
+
+        result.Comparisons.Should().ContainSingle()
+            .Which.Winner.Should().Be(BattleSide.Defender);
+    }
+
+    [Theory]
+    [InlineData(new[] { 6, 6, 6 }, new[] { 1, 1 })]
+    [InlineData(new[] { 1, 1, 1 }, new[] { 6, 6 })]
+    [InlineData(new[] { 6, 1 }, new[] { 5, 2 })]
+    [InlineData(new[] { 3 }, new[] { 3, 3 })]
+    public void Fight_LossesAlwaysMatchTheComparisons(int[] attacker, int[] defender)
+    {
+        var result = BattleService.Fight(attacker, defender);
+
+        result.AttackerLosses.Should().Be(result.Comparisons.Count(c => c.Winner == BattleSide.Defender));
+        result.DefenderLosses.Should().Be(result.Comparisons.Count(c => c.Winner == BattleSide.Attacker));
+        (result.AttackerLosses + result.DefenderLosses).Should().Be(Math.Min(attacker.Length, defender.Length));
+    }
+
     [Fact]
     public void Fight_WhenDefenderHasHigherDie_AttackerLosesTroop()
     {

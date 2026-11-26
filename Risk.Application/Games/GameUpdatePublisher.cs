@@ -57,7 +57,7 @@ public sealed class GameUpdatePublisher(
         var territories = game.Territories.OrderBy(territory => territory.Identifier);
         if (game.Settings?.HasFogOfWar != true)
             return new GameUpdateMessage(
-                GameDetailResponse.From(game),
+                GameDetailResponse.From(game, visibleTerritories: null),
                 territories.Select(TerritoryResponse.From).ToList());
 
         var visible = viewerUserId is { } userId
@@ -65,7 +65,7 @@ public sealed class GameUpdatePublisher(
             : new HashSet<string>();
 
         return new GameUpdateMessage(
-            GameDetailResponse.From(game),
+            GameDetailResponse.From(game, visible),
             territories
                 .Where(territory => visible.Contains(territory.Identifier))
                 .Select(TerritoryResponse.From)

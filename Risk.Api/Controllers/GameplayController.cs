@@ -25,7 +25,6 @@ public sealed class GameplayController(IGameplayService gameplay) : ControllerBa
             request.FromTerritoryId,
             request.ToTerritoryId,
             request.AttackingTroopsCount,
-            request.DefendingTroopsCount,
             request.MovingTroopsCount), ct);
         return Ok(result);
     }
@@ -58,11 +57,16 @@ public sealed class GameplayController(IGameplayService gameplay) : ControllerBa
         return NoContent();
     }
 
+    /// <param name="FromTerritoryId">The attacking territory (territory state id).</param>
+    /// <param name="ToTerritoryId">The defending territory (territory state id).</param>
+    /// <param name="AttackingTroopsCount">How many dice the attacker rolls: 1–3, leaving one troop behind.</param>
+    /// <param name="MovingTroopsCount">Troops to move in if the territory is conquered; null leaves the conquest pending.</param>
+    /// <param name="DefendingTroopsCount">Ignored: the server always rolls as many dice as the defender may. Will be removed.</param>
     public sealed record AttackRequest(
         Guid FromTerritoryId,
         Guid ToTerritoryId,
         int AttackingTroopsCount,
-        int DefendingTroopsCount = 2,
+        [property: Obsolete("Ignored. The server decides the defender's dice.")] int? DefendingTroopsCount = null,
         int? MovingTroopsCount = null);
 
     public sealed record BlitzRequest(

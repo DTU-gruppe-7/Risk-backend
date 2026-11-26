@@ -479,6 +479,24 @@ public sealed class Game
     public bool HasPendingConquest =>
         PendingConquestFromTerritoryId is not null || PendingConquestToTerritoryId is not null;
 
+    /// <summary>
+    /// The conquest waiting for troops to move in, with the limits <see cref="CompletePendingConquest"/>
+    /// accepts. Null when nothing is pending. Requires <see cref="Territories"/> to be loaded.
+    /// </summary>
+    public PendingConquest? FindPendingConquest()
+    {
+        var from = _territories.FirstOrDefault(t => t.Id == PendingConquestFromTerritoryId);
+        var to = _territories.FirstOrDefault(t => t.Id == PendingConquestToTerritoryId);
+        if (from is null || to is null)
+            return null;
+
+        var (minTroops, maxTroops) = ConquestTroopLimits(from);
+        return new PendingConquest(from, to, minTroops, maxTroops);
+    }
+
+    /// <summary>The troops that may move into a conquered territory: at least one, and the origin keeps at least one.</summary>
+    private static (int Min, int Max) ConquestTroopLimits(Territory from) => (1, from.TroopCount - 1);
+
     /// <summary>Blocks every action that must not happen before a pending conquest is completed.</summary>
     public void EnsureNoPendingConquest()
     {
@@ -522,7 +540,8 @@ public sealed class Game
             throw new BusinessRuleException("There is no pending conquest for these territories.");
         if (CurrentPlayerId != playerId || CurrentPhase != GamePhase.Attack)
             throw new BusinessRuleException("Only the active player can complete a conquest.");
-        if (troops <= 0 || troops >= from.TroopCount)
+        var (minTroops, maxTroops) = ConquestTroopLimits(from);
+        if (troops < minTroops || troops > maxTroops)
             throw new BusinessRuleException("The origin territory must retain at least one troop.");
 
         from.RemoveTroops(troops);
@@ -641,6 +660,11 @@ public sealed class Game
 
     private void BumpVersion() => Version++;
 }
+
+/// <summary>A conquered territory waiting for the attacker to move troops in, and how many they may move.</summary>
+/// <param name="From">The territory that attacked.</param>
+/// <param name="To">The conquered territory.</param>
+public sealed record PendingConquest(Territory From, Territory To, int MinTroops, int MaxTroops);
 
 public enum GameState
 {

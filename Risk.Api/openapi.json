@@ -2725,10 +2725,12 @@
         "properties": {
           "fromTerritoryId": {
             "type": "string",
+            "description": "The attacking territory (territory state id).",
             "format": "uuid"
           },
           "toTerritoryId": {
             "type": "string",
+            "description": "The defending territory (territory state id).",
             "format": "uuid"
           },
           "attackingTroopsCount": {
@@ -2737,16 +2739,18 @@
               "integer",
               "string"
             ],
+            "description": "How many dice the attacker rolls: 1–3, leaving one troop behind.",
             "format": "int32"
           },
           "defendingTroopsCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
-            "format": "int32",
-            "default": 2
+            "description": "Ignored: the server always rolls as many dice as the defender may. Will be removed.",
+            "format": "int32"
           },
           "movingTroopsCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -2755,6 +2759,7 @@
               "integer",
               "string"
             ],
+            "description": "Troops to move in if the territory is conquered; null leaves the conquest pending.",
             "format": "int32"
           }
         }
@@ -2765,6 +2770,7 @@
           "defenderLosses",
           "attackerDice",
           "defenderDice",
+          "comparisons",
           "territoryConquered"
         ],
         "type": "object",
@@ -2805,6 +2811,12 @@
                 "string"
               ],
               "format": "int32"
+            }
+          },
+          "comparisons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiceComparisonDto"
             }
           },
           "territoryConquered": {
@@ -2855,6 +2867,9 @@
             "type": "string"
           }
         }
+      },
+      "BattleSide": {
+        "type": "integer"
       },
       "BlitzRequest": {
         "required": [
@@ -2950,7 +2965,8 @@
           "attackerDice",
           "defenderDice",
           "attackerLosses",
-          "defenderLosses"
+          "defenderLosses",
+          "comparisons"
         ],
         "type": "object",
         "properties": {
@@ -2991,6 +3007,12 @@
               "string"
             ],
             "format": "int32"
+          },
+          "comparisons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiceComparisonDto"
+            }
           }
         }
       },
@@ -3162,6 +3184,35 @@
           }
         }
       },
+      "DiceComparisonDto": {
+        "required": [
+          "attackerDie",
+          "defenderDie",
+          "winner"
+        ],
+        "type": "object",
+        "properties": {
+          "attackerDie": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "defenderDie": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "winner": {
+            "$ref": "#/components/schemas/BattleSide"
+          }
+        }
+      },
       "FortifyRequest": {
         "required": [
           "fromTerritoryId",
@@ -3203,7 +3254,8 @@
           "startedAt",
           "endedAt",
           "turnStartedAt",
-          "round"
+          "round",
+          "pendingConquest"
         ],
         "type": "object",
         "properties": {
@@ -3291,6 +3343,16 @@
               "string"
             ],
             "format": "int32"
+          },
+          "pendingConquest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PendingConquestResponse"
+              }
+            ]
           }
         }
       },
@@ -3567,6 +3629,41 @@
       },
       "MissionObjectiveType": {
         "type": "integer"
+      },
+      "PendingConquestResponse": {
+        "required": [
+          "fromTerritoryId",
+          "toTerritoryId",
+          "minTroops",
+          "maxTroops"
+        ],
+        "type": "object",
+        "properties": {
+          "fromTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
       },
       "PingResponse": {
         "required": [
