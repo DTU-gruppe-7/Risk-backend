@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 using Scalar.AspNetCore;
 using Risk.Api.Auth;
@@ -14,6 +15,10 @@ using Risk.Application.Interfaces;
 using Risk.Infrastructure;
 using Risk.Infrastructure.Identity;
 using Risk.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
+using Risk.Api.Controllers;
+using System.Threading.RateLimiting;
+using OpenTelemetry.Metrics;
 
 var builder = WebApplication.CreateBuilder(args);
 var isDesignTime = Assembly.GetEntryAssembly() != Assembly.GetExecutingAssembly();
@@ -46,8 +51,8 @@ if (builder.Environment.IsDevelopment())
             Host = "localhost",
             Port = int.Parse(env.GetValueOrDefault("POSTGRES_PORT", "5433")),
             Database = Require("POSTGRES_DB"),
-            Username = Require("POSTGRES_USER"),
-            Password = Require("POSTGRES_PASSWORD"),
+            Username = "risk_app",
+            Password = Require("POSTGRES_APP_PASSWORD"),
         };
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -101,6 +106,58 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 
+// Login og registrering: Højst N forsøg i minuttet pr. IP. Lockout pr. konto sker i Identity.
+// IP'en er klientens og ikke Caddy, fordi UseForwardedHeaders kører først.
+var authPermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthController.RateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = authPermitLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }
+    ));
+    options.OnRejected = async (context, _) =>
+    {
+        var http = context.HttpContext;
+        http.RequestServices.GetRequiredService<ILogger<Program>>()
+        .LogWarning("Too many auth requests from {RemoteIp} to {Path}.",
+        http.Connection.RemoteIpAddress, http.Request.Path);
+
+        await http.RequestServices.GetRequiredService<IProblemDetailsService>()
+        .WriteAsync(
+            new ProblemDetailsContext
+            {
+                HttpContext = http,
+                ProblemDetails =
+                {
+                    Status = StatusCodes.Status429TooManyRequests,
+                    Title = "Too many requests.",
+                    Detail = "Too many attempts. Wait a minute and try again.",
+                },
+            }
+        );
+    };
+});
+
+// Metrics sendes med OTLP til Prometheus på serveren. Lokalt og i testene er OTEL_EXPORTER_OTLP_ENDPOINT
+// ikke sat, og så registreres intet. Adresse, protokol, servicenavn og miljø kommer fra OTEL_*-variablerne.
+if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+{
+    builder.Services.AddOpenTelemetry().WithMetrics(metrics => metrics
+        .AddMeter(
+            "Microsoft.AspNetCore.Hosting",          // requests, svartider og statuskoder
+            "Microsoft.AspNetCore.Server.Kestrel",   // forbindelser
+            "Microsoft.AspNetCore.Http.Connections", // SignalR-forbindelser
+            "Microsoft.AspNetCore.RateLimiting",     // afviste forsøg på login og registrering
+            "System.Runtime",                        // hukommelse, GC og tråde
+            AuthMetrics.MeterName)                   // loginforsøg fordelt på resultat
+        .AddOtlpExporter());
+}
+
 // Både "dotnet build" (OpenAPI-generering), "dotnet ef" og migration bundles bygger
 // host'en uden at starte den. Kendetegnet er at entry-assembly er værktøjet, ikke API'et selv.
 // Samme JwtOptions som JwtTokenService bruger, så udstedelse og validering aldrig kan glide fra hinanden.
@@ -125,7 +182,11 @@ builder.Services
         options.Events = RealtimeEndpoints.ReadTokenFromQueryOnHubs();
     });
 
-builder.Services.AddAuthorization();
+// Deny by default: et endpoint uden [Authorize] eller [AllowAnonymous] kræver login.
+builder.Services.AddAuthorization(options =>
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
 
 var app = builder.Build();
 
@@ -134,16 +195,17 @@ app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();                 // dokumentet på /openapi/v1.json
-    app.MapScalarApiReference();      // brugerfladen på /scalar/v1
+    app.MapOpenApi().AllowAnonymous();                 // dokumentet på /openapi/v1.json
+    app.MapScalarApiReference().AllowAnonymous();      // brugerfladen på /scalar/v1
     app.UseCors("frontend");
 }
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
-app.MapHealthChecks("/healthz", new HealthCheckOptions { Predicate = _ => false });
-app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+app.MapHealthChecks("/healthz", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();
 app.MapControllers();
 app.MapRealtimeHubs();
 

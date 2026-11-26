@@ -40,11 +40,11 @@ public sealed class GameService(
     {
         var game = new Game(currentUser.UserId);
         game.ConfigureSettings(
-            maxPlayers:    request.MaxPlayers ?? GameSetting.DefaultMaxPlayers,
-            timer:         request.Timer ?? 0,
+            maxPlayers: request.MaxPlayers ?? GameSetting.DefaultMaxPlayers,
+            timer: request.Timer ?? 0,
             turnTimeLimit: request.TurnTimeLimit ?? 0,
-            hasFogOfWar:   request.HasFogOfWar ?? false,
-            hasMissions:   request.HasMissions ?? false,
+            hasFogOfWar: request.HasFogOfWar ?? false,
+            hasMissions: request.HasMissions ?? false,
             blizzardCount: request.BlizzardCount ?? 0,
             victoryMode:   request.VictoryMode,
             cardTradeMode: request.CardTradeMode);

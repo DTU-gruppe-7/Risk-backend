@@ -88,9 +88,4 @@ public sealed class GameAccess(
             throw new ForbiddenException("Only the host can do this.");
         return game;
     }
-
-    /// <summary>Validates that a player id from the request belongs to the game.</summary>
-    public static Player RequirePlayerInGame(Game game, Guid playerId) =>
-        game.FindPlayer(playerId)
-        ?? throw new ValidationFailedException("playerId", "The player is not part of this game.");
 }

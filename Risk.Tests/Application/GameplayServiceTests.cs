@@ -82,8 +82,17 @@ public class GameplayServiceTests
 
         return new Fixture
         {
-            Service = service, Resolver = resolver, Game = game, Red = red, Blue = blue, Green = green,
-            From = from, To = to, Dice = dice, BonusCards = bonusCards, UnitOfWork = unitOfWork,
+            Service = service,
+            Resolver = resolver,
+            Game = game,
+            Red = red,
+            Blue = blue,
+            Green = green,
+            From = from,
+            To = to,
+            Dice = dice,
+            BonusCards = bonusCards,
+            UnitOfWork = unitOfWork,
         };
     }
 

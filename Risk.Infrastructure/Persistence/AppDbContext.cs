@@ -10,28 +10,28 @@ namespace Risk.Infrastructure.Persistence;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options), IDataProtectionKeyContext
 {
-      public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     // Bemærk navnet: IdentityDbContext har allerede en Users-property til
     // ApplicationUser, så domæne-brugerne får deres eget navn.
-    public DbSet<User> DomainUsers           => Set<User>();
+    public DbSet<User> DomainUsers => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-    public DbSet<Game> Games                 => Set<Game>();
-    public DbSet<GameSetting> GameSettings   => Set<GameSetting>();
-    public DbSet<Player> Players             => Set<Player>();
-    public DbSet<Territory> Territories      => Set<Territory>();
-    public DbSet<BonusCard> BonusCards       => Set<BonusCard>();
-    public DbSet<MissionCard> MissionCards   => Set<MissionCard>();
+    public DbSet<Game> Games => Set<Game>();
+    public DbSet<GameSetting> GameSettings => Set<GameSetting>();
+    public DbSet<Player> Players => Set<Player>();
+    public DbSet<Territory> Territories => Set<Territory>();
+    public DbSet<BonusCard> BonusCards => Set<BonusCard>();
+    public DbSet<MissionCard> MissionCards => Set<MissionCard>();
 
     // Static board (reference data, seeded from ClassicMap)
     public DbSet<MapContinent> MapContinents => Set<MapContinent>();
     public DbSet<MapTerritory> MapTerritories => Set<MapTerritory>();
-    public DbSet<MapBorder> MapBorders       => Set<MapBorder>();
+    public DbSet<MapBorder> MapBorders => Set<MapBorder>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
-      base.OnModelCreating(builder);
+        base.OnModelCreating(builder);
 
-      builder.Entity<DataProtectionKey>().ToTable("data_protection_keys");
+        builder.Entity<DataProtectionKey>().ToTable("data_protection_keys");
 
 
         // ------------------------------------------------------------------
