@@ -80,13 +80,23 @@ public sealed class Game
 
     /// <summary>True for the host and for every user who has joined as a player.</summary>
     public bool HasParticipant(Guid userId) =>
-        IsHost(userId) || _players.Any(p => p.UserId == userId);
+        IsHost(userId) || FindPlayerByUser(userId) is not null;
 
     /// <summary>The user ids of every player and the host, each once (a host who plays is not repeated).</summary>
     public IEnumerable<Guid> ParticipantUserIds =>
         _players.Select(p => p.UserId).Append(HostId).Distinct();
 
     public Player? FindPlayer(Guid playerId) => _players.FirstOrDefault(p => p.Id == playerId);
+
+    /// <summary>The player the given user plays as, or null when the user is not a player (e.g. a host who only watches).</summary>
+    public Player? FindPlayerByUser(Guid userId) => _players.FirstOrDefault(p => p.UserId == userId);
+
+    /// <summary>Rejects an action from a player whose turn it is not.</summary>
+    public void EnsureCurrentTurn(Guid playerId)
+    {
+        if (CurrentPlayerId != playerId)
+            throw new BusinessRuleException("It is not this player's turn.");
+    }
 
     /// <summary>The board with this game's territory state. Requires <see cref="Territories"/> to be loaded.</summary>
     public GameBoard BoardOn(MapGraph map) => new(map, _territories);
@@ -115,7 +125,7 @@ public sealed class Game
     public Player AddPlayer(Guid userId, string color)
     {
         EnsureState(GameState.Lobby, "The game has already started.");
-        if (_players.Any(p => p.UserId == userId))
+        if (FindPlayerByUser(userId) is not null)
             throw new BusinessRuleException("You are already in this game.");
         if (_players.Count >= MaxPlayers)
             throw new BusinessRuleException("The game is full.");
@@ -185,15 +195,7 @@ public sealed class Game
         }
 
         // 4. Fordel de resterende klassiske starttropper tilfældigt på spillerens territorier.
-        var startingTroops = players.Count switch
-        {
-            2 => 40,
-            3 => 35,
-            4 => 30,
-            5 => 25,
-            6 => 20,
-            _ => throw new BusinessRuleException("Unsupported number of players for classic Risk."),
-        };
+        var startingTroops = ReinforcementRules.StartingTroops(players.Count);
 
         foreach (var player in players)
         {
@@ -266,12 +268,7 @@ public sealed class Game
 
         var bonusTerritory = HasReceivedTerritoryBonusThisTurn
             ? null
-            : cards
-                .Select(card => _territories.FirstOrDefault(territory =>
-                    card.TerritoryIdentifier is not null &&
-                    territory.Identifier == card.TerritoryIdentifier &&
-                    territory.OwnerId == playerId))
-                .FirstOrDefault(territory => territory is not null);
+            : CardTradeRules.TerritoryBonusTarget(cards, _territories, playerId);
 
         foreach (var card in cards)
             card.MarkAsUsed();
@@ -292,8 +289,7 @@ public sealed class Game
     public void EndPhase(Guid playerId, GamePhase expectedNextPhase, MapGraph map, DateTimeOffset now)
     {
         EnsureState(GameState.InProgress, "A phase can only be ended while the game is in progress.");
-        if (CurrentPlayerId != playerId)
-            throw new BusinessRuleException("It is not this player's turn.");
+        EnsureCurrentTurn(playerId);
         if (RequirePlayer(playerId).IsEliminated)
             throw new BusinessRuleException("An eliminated player cannot end a phase.");
         EnsureNoPendingConquest();
@@ -411,17 +407,16 @@ public sealed class Game
     }
 
     /// <summary>
-    /// Troops a player gets when their turn starts. In the first round, players late in the turn order
-    /// get <see cref="FirstRoundBonus"/> on top, since they may lose territories before their first turn.
+    /// Troops a player gets when their turn starts, including the first-round bonus
+    /// (<see cref="ReinforcementRules.FirstRoundBonus"/>).
     /// </summary>
-    private int ReinforcementsAtTurnStart(Player player, MapGraph map) =>
-        CalculateReinforcements(player.Id, map) + (Round == 1 ? FirstRoundBonus(player) : 0);
-
-    /// <summary>The first three seats get no bonus; every seat after that gets one more troop (4th +1 … 6th +3).</summary>
-    private static int FirstRoundBonus(Player player) =>
-        Math.Max(0, player.TurnOrder - SeatsWithoutFirstRoundBonus);
-
-    private const int SeatsWithoutFirstRoundBonus = 3;
+    private int ReinforcementsAtTurnStart(Player player, MapGraph map)
+    {
+        var troops = ReinforcementRules.ForTerritories(
+            _territories.Count(t => t.OwnerId == player.Id),
+            BoardOn(map).ContinentBonusFor(player.Id));
+        return Round == 1 ? troops + ReinforcementRules.FirstRoundBonus(player.TurnOrder) : troops;
+    }
 
     private void AssignRandomTurnOrder(Random random)
     {
@@ -441,13 +436,6 @@ public sealed class Game
         }
     }
 
-    private int CalculateReinforcements(Guid playerId, MapGraph map)
-    {
-        var ownedTerritories = _territories.Count(t => t.OwnerId == playerId);
-        var territoryReinforcements = Math.Max(3, ownedTerritories / 3);
-        var continentBonus = BoardOn(map).ContinentBonusFor(playerId);
-        return territoryReinforcements + continentBonus;
-    }
 
     public bool RecordConquest(Guid playerId)
     {
@@ -467,8 +455,7 @@ public sealed class Game
         EnsureState(GameState.InProgress, "Fortification can only happen while the game is in progress.");
         if (CurrentPhase != GamePhase.Fortify)
             throw new BusinessRuleException("Fortification can only happen during the Fortify phase.");
-        if (CurrentPlayerId != playerId)
-            throw new BusinessRuleException("It is not this player's turn.");
+        EnsureCurrentTurn(playerId);
         if (RequirePlayer(playerId).IsEliminated)
             throw new BusinessRuleException("An eliminated player cannot fortify.");
         if (from.GameId != Id || to.GameId != Id)
@@ -567,8 +554,7 @@ public sealed class Game
         EnsureState(GameState.InProgress, "Troops can only be deployed while the game is in progress.");
         if (CurrentPhase != GamePhase.Deployment)
             throw new BusinessRuleException("Troops can only be deployed during the Deployment phase.");
-        if (CurrentPlayerId != playerId)
-            throw new BusinessRuleException("It is not this player's turn.");
+        EnsureCurrentTurn(playerId);
         EnsureNoPendingConquest();
 
         var player = RequirePlayer(playerId);

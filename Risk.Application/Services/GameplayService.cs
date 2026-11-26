@@ -176,8 +176,7 @@ public sealed class GameplayService(
 
         var player = access.RequireCurrentPlayer(game);
         game.EnsureNoPendingConquest();
-        if (game.CurrentPlayerId != player.Id)
-            throw new BusinessRuleException("It is not this player's turn.");
+        game.EnsureCurrentTurn(player.Id);
 
         var from = FindTerritory(game, fromTerritoryId, "Attacking territory");
         var to = FindTerritory(game, toTerritoryId, "Defending territory");

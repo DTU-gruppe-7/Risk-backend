@@ -591,6 +591,30 @@ public class GameTests
     }
 
     [Fact]
+    public void FindPlayerByUser_finds_players_but_not_a_host_who_only_watches()
+    {
+        var game = new Game(Host);
+        var user = Guid.NewGuid();
+        var red = game.AddPlayer(user, "red");
+
+        Assert.Same(red, game.FindPlayerByUser(user));
+        Assert.Null(game.FindPlayerByUser(Host));
+    }
+
+    [Fact]
+    public void EnsureCurrentTurn_only_accepts_the_player_whose_turn_it_is()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.StartInJoinOrder(Map);
+
+        game.EnsureCurrentTurn(red.Id);
+        var error = Assert.Throws<BusinessRuleException>(() => game.EnsureCurrentTurn(blue.Id));
+        Assert.Equal("It is not this player's turn.", error.Message);
+    }
+
+    [Fact]
     public void Battle_losses_reduce_troops_and_bump_the_version_even_without_a_conquest()
     {
         var game = new Game(Host);

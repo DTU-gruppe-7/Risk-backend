@@ -132,6 +132,38 @@ public class CardTradeTests
     // Territory bonus
     // -------------------------------------------------------------------------
 
+    /// <summary>A loose territory on the board, owned by <paramref name="ownerId"/>.</summary>
+    private static Territory Owned(string identifier, Guid ownerId)
+    {
+        var territory = new Territory(Guid.NewGuid(), identifier);
+        territory.Claim(ownerId);
+        return territory;
+    }
+
+    private static BonusCard Card(string? territory) => new(Guid.NewGuid(), I, territory);
+
+    [Fact]
+    public void The_bonus_target_is_the_first_card_whose_territory_the_player_owns()
+    {
+        var me = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        Territory[] board = [Owned("alaska", other), Owned("peru", me), Owned("egypt", me)];
+
+        var target = CardTradeRules.TerritoryBonusTarget(
+            [Card(null), Card("alaska"), Card("egypt"), Card("peru")], board, me);
+
+        Assert.Equal("egypt", target?.Identifier);
+    }
+
+    [Fact]
+    public void There_is_no_bonus_target_when_the_player_owns_none_of_the_cards_territories()
+    {
+        var me = Guid.NewGuid();
+        Territory[] board = [Owned("alaska", Guid.NewGuid()), Owned("peru", me)];
+
+        Assert.Null(CardTradeRules.TerritoryBonusTarget([Card("alaska"), Card(null), Card(null)], board, me));
+    }
+
     [Theory]
     [InlineData(CardTradeMode.Progressive)]
     [InlineData(CardTradeMode.Fixed)]

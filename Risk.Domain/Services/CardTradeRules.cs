@@ -4,7 +4,8 @@ namespace Risk.Domain.Services;
 
 /// <summary>
 /// What a set of three bonus cards is worth. Two official rule sets exist, chosen per game
-/// (<see cref="CardTradeMode"/>). The territory bonus is the same in both and handled by <see cref="Game"/>.
+/// (<see cref="CardTradeMode"/>). The territory bonus is the same in both
+/// (<see cref="TerritoryBonusTarget"/>); <see cref="Game"/> only tracks that it is given once per turn.
 /// </summary>
 public static class CardTradeRules
 {
@@ -25,6 +26,20 @@ public static class CardTradeRules
         var threeOfAKind = nonWild.Count == 3 && nonWild.Distinct().Count() == 1;
         var oneOfEach = nonWild.Count == 3 && nonWild.Distinct().Count() == 3;
         return hasWild || threeOfAKind || oneOfEach;
+    }
+
+    /// <summary>
+    /// The territory that gets <see cref="TerritoryBonusTroops"/>: the one shown on the first card in
+    /// <paramref name="cards"/> that <paramref name="playerId"/> owns, or null when they own none of them.
+    /// </summary>
+    public static Territory? TerritoryBonusTarget(
+        IReadOnlyList<BonusCard> cards, IEnumerable<Territory> territories, Guid playerId)
+    {
+        var owned = territories.Where(territory => territory.OwnerId == playerId).ToList();
+        return cards
+            .Where(card => card.TerritoryIdentifier is not null)
+            .Select(card => owned.FirstOrDefault(territory => territory.Identifier == card.TerritoryIdentifier))
+            .FirstOrDefault(territory => territory is not null);
     }
 
     /// <summary>

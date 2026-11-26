@@ -22,7 +22,7 @@ public sealed class MissionCardService(
     public async Task<IReadOnlyList<MissionCardResponse>> GetMineAsync(Guid gameId, CancellationToken ct = default)
     {
         var game = await access.RequireParticipantAsync(gameId, ct);
-        var me = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId);
+        var me = game.FindPlayerByUser(currentUser.UserId);
         if (me is null) return [];
 
         var list = await cards.GetByGameIdAsync(gameId, me.Id, ct);

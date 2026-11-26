@@ -57,19 +57,18 @@ public sealed class GameAccess(
     {
         var game = await games.GetByIdWithDetailsAsync(gameId, ct)
                    ?? throw new NotFoundException("Game", gameId);
-        var player = game.Players.FirstOrDefault(p => p.UserId == userId)
+        var player = game.FindPlayerByUser(userId)
                      ?? throw new ForbiddenException("You are not a player in this game.");
         if (player.IsEliminated)
             throw new ForbiddenException("You have been eliminated from this game.");
         if (game.State != GameState.InProgress)
             throw new BusinessRuleException("The game is not in progress.");
-        if (game.CurrentPlayerId != player.Id)
-            throw new BusinessRuleException("It is not this player's turn.");
+        game.EnsureCurrentTurn(player.Id);
         return (game, player);
     }
 
     public Player RequireCurrentPlayer(Game game) =>
-        game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)
+        game.FindPlayerByUser(currentUser.UserId)
         ?? throw new ForbiddenException("You are not a player in this game.");
 
     /// <summary>The game, if the current user is its host.</summary>

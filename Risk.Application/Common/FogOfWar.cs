@@ -17,7 +17,7 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
 
     /// <summary>The current user's player in this game, or null for a host who is not playing.</summary>
     public Guid? ViewerPlayerId(Game game) =>
-        game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)?.Id;
+        game.FindPlayerByUser(currentUser.UserId)?.Id;
 
     /// <summary>The territories the current user can see, or null when the game has no fog of war.</summary>
     public async Task<IReadOnlySet<string>?> VisibleTerritoriesAsync(
@@ -51,7 +51,7 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
         if (game.Settings?.HasFogOfWar != true)
             return null;
 
-        var viewerPlayerId = game.Players.FirstOrDefault(player => player.UserId == viewerUserId)?.Id;
+        var viewerPlayerId = game.FindPlayerByUser(viewerUserId)?.Id;
         return viewerPlayerId is { } playerId
             ? VisibleTerritoriesFor(game, graph, playerId)
             : new HashSet<string>();
