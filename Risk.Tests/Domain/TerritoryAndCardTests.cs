@@ -99,7 +99,7 @@ public class CardTests
         var game = new Game(Guid.NewGuid());
         var player = game.AddPlayer(Guid.NewGuid(), "red");
         var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(ClassicMap.Graph, new Random(1));
+        game.StartInJoinOrder(ClassicMap.Graph);
         var mission = new MissionCard(
             game.Id, "Conquer the world", "Hold every territory.",
             MissionObjectiveType.ControlAllTerritories);
@@ -125,7 +125,7 @@ public class CardTests
         var game = new Game(Guid.NewGuid());
         var player = game.AddPlayer(Guid.NewGuid(), "red");
         var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(ClassicMap.Graph, new Random(1));
+        game.StartInJoinOrder(ClassicMap.Graph);
         var mission = new MissionCard(
             game.Id, "Conquer the world", "Hold every territory.",
             MissionObjectiveType.ControlAllTerritories);

@@ -161,3 +161,35 @@ internal sealed class FakeGameRealtime : IGameRealtime
         return Task.CompletedTask;
     }
 }
+
+/// <summary>
+/// A seeded <see cref="Random"/> that keeps the join order as the turn order when a game starts.
+/// <see cref="Game.Start"/> first shuffles the seats (Fisher–Yates, one <c>Next(i + 1)</c> per seat after the
+/// first); answering those draws with <c>i</c> means "no swap". Every later draw comes from
+/// <c>new Random(seed)</c>, so the board is the same as before turn orders were shuffled.
+/// </summary>
+internal sealed class KeepJoinOrderRandom(int playerCount, int seed = 1) : Random
+{
+    private readonly Random _inner = new(seed);
+    private int _seatDrawsLeft = playerCount - 1;
+
+    public override int Next(int maxValue)
+    {
+        if (_seatDrawsLeft == 0)
+            return _inner.Next(maxValue);
+
+        _seatDrawsLeft--;
+        return maxValue - 1;
+    }
+
+    public override int Next() => _inner.Next();
+    public override int Next(int minValue, int maxValue) => _inner.Next(minValue, maxValue);
+    public override long NextInt64() => _inner.NextInt64();
+    public override long NextInt64(long maxValue) => _inner.NextInt64(maxValue);
+    public override long NextInt64(long minValue, long maxValue) => _inner.NextInt64(minValue, maxValue);
+    public override double NextDouble() => _inner.NextDouble();
+    public override float NextSingle() => _inner.NextSingle();
+    public override void NextBytes(byte[] buffer) => _inner.NextBytes(buffer);
+    public override void NextBytes(Span<byte> buffer) => _inner.NextBytes(buffer);
+    protected override double Sample() => _inner.NextDouble();
+}

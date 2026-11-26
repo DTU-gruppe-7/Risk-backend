@@ -77,7 +77,9 @@ public sealed class GameHubTests(ApiFixture api)
             owned.Concat(owned.SelectMany(id => neighbours[id])).Distinct().Order().ToList(),
             Identifiers(started.Territories));
 
-        Assert.All(started.Players.EnumerateArray().Where(p => p.GetProperty("id").GetString() != redPlayerId),
+        // The turn order is random, so only the player whose turn it is holds reinforcements.
+        var currentPlayerId = started.Game("currentPlayerId");
+        Assert.All(started.Players.EnumerateArray().Where(p => p.GetProperty("id").GetString() != currentPlayerId),
             p => Assert.Equal(0, p.GetProperty("reinforcementTroops").GetInt32()));
     }
 

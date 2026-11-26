@@ -4,6 +4,8 @@ using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
 using Risk.Domain.Map;
 
+using Risk.Tests.Domain;
+
 namespace Risk.Tests.Application;
 
 public class FogOfWarTests
@@ -19,7 +21,7 @@ public class FogOfWarTests
         var red = game.AddPlayer(redUser, "red");
         var blue = game.AddPlayer(blueUser, "blue");
         game.ConfigureSettings(6, 0, 0, fog, false);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         return (game, red, blue, redUser, blueUser, host);
     }
 

@@ -3,6 +3,8 @@ using Risk.Application.Services;
 using Risk.Domain.Entities;
 using Risk.Domain.Map;
 
+using Risk.Tests.Domain;
+
 namespace Risk.Tests.Application;
 
 public class TurnTimeoutServiceTests
@@ -29,7 +31,7 @@ public class TurnTimeoutServiceTests
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         var green = threePlayers ? game.AddPlayer(Guid.NewGuid(), "green") : null;
         game.ConfigureSettings(6, 0, 10, false, false);
-        game.Start(ClassicMap.Graph, new Random(1));
+        game.StartInJoinOrder(ClassicMap.Graph);
 
         var from = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, from, red.ReinforcementTroops);

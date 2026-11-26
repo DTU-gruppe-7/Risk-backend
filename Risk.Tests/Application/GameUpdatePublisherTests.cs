@@ -4,6 +4,8 @@ using Risk.Application.Games;
 using Risk.Domain.Entities;
 using Risk.Domain.Map;
 
+using Risk.Tests.Domain;
+
 namespace Risk.Tests.Application;
 
 public class GameUpdatePublisherTests
@@ -23,7 +25,7 @@ public class GameUpdatePublisherTests
         var red = game.AddPlayer(redUser, "red");
         var blue = game.AddPlayer(blueUser, "blue");
         game.ConfigureSettings(6, 0, 0, fog, false);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         var games = new FakeGameRepository();
         games.Add(game);

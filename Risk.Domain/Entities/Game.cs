@@ -144,7 +144,9 @@ public sealed class Game
     /// the players, with <see cref="GameSetting.BlizzardCount"/> of them turned into blizzards.
     /// </summary>
     /// <param name="map">The board.</param>
-    /// <param name="random">Decides blizzard placement, territory ownership and initial troop placement.</param>
+    /// <param name="random">
+    /// Decides the turn order, blizzard placement, territory ownership and initial troop placement.
+    /// </param>
     public void Start(MapGraph map, Random random)
     {
         EnsureState(GameState.Lobby, "Game can only be started from the Lobby state.");
@@ -153,6 +155,9 @@ public sealed class Game
         if (_players.Count is < GameSetting.MinPlayers or > GameSetting.DefaultMaxPlayers)
             throw new BusinessRuleException(
                 $"A classic Risk game requires between {GameSetting.MinPlayers} and {GameSetting.DefaultMaxPlayers} players.");
+
+        // 0. Træk turrækkefølgen tilfældigt. Den ligger fast resten af spillet.
+        AssignRandomTurnOrder(random);
 
         // 1. Opret alle territorier på kortet og marker blizzards
         var blizzards = BlizzardPlacement.Choose(
@@ -170,13 +175,7 @@ public sealed class Game
         var playableTerritories = _territories
             .Where(territory => !territory.IsBlizzard)
             .ToList();
-
-        for (var i = playableTerritories.Count - 1; i > 0; i--)
-        {
-            var swapIndex = random.Next(i + 1);
-            (playableTerritories[i], playableTerritories[swapIndex]) =
-                (playableTerritories[swapIndex], playableTerritories[i]);
-        }
+        Shuffle(playableTerritories, random);
 
         // 3. Fordel territorierne skiftevis (Round-Robin) til spillerne
         var players = _players.OrderBy(player => player.TurnOrder).ToList();
@@ -206,10 +205,10 @@ public sealed class Game
 
         // 5. Start første spillers normale tur med reinforcement deployment.
         var firstPlayer = players.First();
-        firstPlayer.AddReinforcements(CalculateReinforcements(firstPlayer.Id, map));
+        Round = 1;
+        firstPlayer.AddReinforcements(ReinforcementsAtTurnStart(firstPlayer, map));
         CurrentPlayerId = firstPlayer.Id;
         CurrentPhase = GamePhase.Deployment;
-        Round = 1;
         State = GameState.InProgress;
         StartedAt = DateTimeOffset.UtcNow;
         TurnStartedAt = StartedAt;
@@ -402,13 +401,44 @@ public sealed class Game
         if (current is null || next.TurnOrder <= current.TurnOrder)
             Round++;
 
-        next.AddReinforcements(CalculateReinforcements(next.Id, map));
+        next.AddReinforcements(ReinforcementsAtTurnStart(next, map));
         HasConqueredTerritoryThisTurn = false;
         HasReceivedTerritoryBonusThisTurn = false;
         CurrentPlayerId = next.Id;
         CurrentPhase = GamePhase.Deployment;
         TurnStartedAt = now;
         BumpVersion();
+    }
+
+    /// <summary>
+    /// Troops a player gets when their turn starts. In the first round, players late in the turn order
+    /// get <see cref="FirstRoundBonus"/> on top, since they may lose territories before their first turn.
+    /// </summary>
+    private int ReinforcementsAtTurnStart(Player player, MapGraph map) =>
+        CalculateReinforcements(player.Id, map) + (Round == 1 ? FirstRoundBonus(player) : 0);
+
+    /// <summary>The first three seats get no bonus; every seat after that gets one more troop (4th +1 … 6th +3).</summary>
+    private static int FirstRoundBonus(Player player) =>
+        Math.Max(0, player.TurnOrder - SeatsWithoutFirstRoundBonus);
+
+    private const int SeatsWithoutFirstRoundBonus = 3;
+
+    private void AssignRandomTurnOrder(Random random)
+    {
+        var seats = Enumerable.Range(1, _players.Count).ToList();
+        Shuffle(seats, random);
+        for (var index = 0; index < _players.Count; index++)
+            _players[index].AssignTurnOrder(seats[index]);
+    }
+
+    /// <summary>Fisher–Yates shuffle in place.</summary>
+    private static void Shuffle<T>(IList<T> items, Random random)
+    {
+        for (var i = items.Count - 1; i > 0; i--)
+        {
+            var swapIndex = random.Next(i + 1);
+            (items[i], items[swapIndex]) = (items[swapIndex], items[i]);
+        }
     }
 
     private int CalculateReinforcements(Guid playerId, MapGraph map)

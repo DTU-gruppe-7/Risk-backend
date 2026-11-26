@@ -6,6 +6,8 @@ using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
 using Risk.Domain.Map;
 
+using Risk.Tests.Domain;
+
 namespace Risk.Tests.Application;
 
 public class GameplayServiceTests
@@ -48,7 +50,7 @@ public class GameplayServiceTests
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         var green = threePlayers ? game.AddPlayer(Guid.NewGuid(), "green") : null;
-        game.Start(ClassicMap.Graph, new Random(1));
+        game.StartInJoinOrder(ClassicMap.Graph);
 
         var from = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, from, red.ReinforcementTroops);

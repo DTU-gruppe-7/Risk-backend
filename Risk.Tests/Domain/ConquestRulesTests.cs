@@ -19,7 +19,7 @@ public class ConquestRulesTests
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         if (turnTimeLimit > 0)
             game.ConfigureSettings(6, 0, turnTimeLimit, false, false);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         var from = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, from, red.ReinforcementTroops);
@@ -155,7 +155,7 @@ public class ConquestRulesTests
         var game = new Game(Guid.NewGuid());
         game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
 
         if (blocked)
@@ -189,7 +189,7 @@ public class ConquestRulesTests
         var game = new Game(Guid.NewGuid());
         game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Throws<BusinessRuleException>(game.ReturnToDeploymentForCardTrade);
     }

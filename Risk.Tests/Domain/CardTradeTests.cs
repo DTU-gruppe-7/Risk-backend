@@ -24,7 +24,7 @@ public class CardTradeTests
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         game.ConfigureSettings(6, 0, 0, false, false, cardTradeMode: mode);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var current = game.FindPlayer(game.CurrentPlayerId!.Value)!;
         return current.Id == red.Id ? new Scenario(game, red, blue) : new Scenario(game, blue, red);
     }

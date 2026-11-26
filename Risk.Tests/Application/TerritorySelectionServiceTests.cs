@@ -5,6 +5,8 @@ using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
 using Risk.Domain.Map;
 
+using Risk.Tests.Domain;
+
 namespace Risk.Tests.Application;
 
 public class TerritorySelectionServiceTests
@@ -23,7 +25,7 @@ public class TerritorySelectionServiceTests
         game.AddPlayer(Guid.NewGuid(), "blue");
         game.AddPlayer(Guid.NewGuid(), "green");
         game.ConfigureSettings(6, 0, 0, fog, false);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         var current = game.FindPlayer(game.CurrentPlayerId!.Value)!;
         var others = game.Players.Where(p => p.Id != current.Id).ToList();
