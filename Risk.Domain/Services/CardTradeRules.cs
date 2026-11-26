@@ -12,8 +12,31 @@ public static class CardTradeRules
     /// <summary>Extra troops placed on a territory shown on a traded card that the player owns.</summary>
     public const int TerritoryBonusTroops = 2;
 
+    /// <summary>The number of cards in a set.</summary>
+    public const int CardsPerTrade = 3;
+
     /// <summary>Fixed mode: a set with one card of each type.</summary>
     public const int FixedOneOfEachValue = 10;
+
+    /// <summary>The unit types; a wild card stands in for any of them.</summary>
+    private static readonly BonusCardType[] UnitTypes =
+        [BonusCardType.Infantry, BonusCardType.Cavalry, BonusCardType.Artillery];
+
+    /// <summary>Fixed mode: three of a kind.</summary>
+    private static readonly IReadOnlyDictionary<BonusCardType, int> FixedThreeOfAKindValues =
+        new Dictionary<BonusCardType, int>
+        {
+            [BonusCardType.Infantry] = 4,
+            [BonusCardType.Cavalry] = 6,
+            [BonusCardType.Artillery] = 8,
+        };
+
+    /// <summary>Every kind of set without wild cards and what it is worth in fixed mode.</summary>
+    public static IReadOnlyList<CardSetValue> FixedSets { get; } =
+    [
+        .. UnitTypes.Select(type => new CardSetValue([type, type, type], FixedThreeOfAKindValues[type])),
+        new CardSetValue(UnitTypes, FixedOneOfEachValue),
+    ];
 
     /// <summary>
     /// Three of a kind, one of each, or any set with a wild card (which stands in for whatever
@@ -23,8 +46,8 @@ public static class CardTradeRules
     {
         var nonWild = NonWildTypes(cards);
         var hasWild = nonWild.Count != cards.Count;
-        var threeOfAKind = nonWild.Count == 3 && nonWild.Distinct().Count() == 1;
-        var oneOfEach = nonWild.Count == 3 && nonWild.Distinct().Count() == 3;
+        var threeOfAKind = nonWild.Count == CardsPerTrade && nonWild.Distinct().Count() == 1;
+        var oneOfEach = nonWild.Count == CardsPerTrade && nonWild.Distinct().Count() == CardsPerTrade;
         return hasWild || threeOfAKind || oneOfEach;
     }
 
@@ -54,6 +77,18 @@ public static class CardTradeRules
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown card trade mode."),
         };
 
+    /// <summary>
+    /// What the next <paramref name="count"/> sets will give, the next one first. Only known in progressive
+    /// mode; in fixed mode the value depends on the cards, so the list is empty.
+    /// </summary>
+    /// <param name="setsTraded">How many sets have been traded in this game so far.</param>
+    public static IReadOnlyList<int> UpcomingValues(CardTradeMode mode, int setsTraded, int count) =>
+        mode == CardTradeMode.Progressive ? ProgressiveValues(setsTraded, count) : [];
+
+    /// <summary>Progressive values for <paramref name="count"/> trades in a row, starting at trade number <paramref name="from"/>.</summary>
+    public static IReadOnlyList<int> ProgressiveValues(int from, int count) =>
+        Enumerable.Range(from, count).Select(ProgressiveValue).ToList();
+
     /// <summary>Progressive: every set traded in the game, by anyone, is worth more than the last.</summary>
     private static int ProgressiveValue(int tradeNumber) =>
         tradeNumber switch
@@ -77,9 +112,9 @@ public static class CardTradeRules
         var options = new List<int>();
 
         // Three of a kind: every non-wild card has the same type (wilds fill the rest).
-        foreach (var type in new[] { BonusCardType.Infantry, BonusCardType.Cavalry, BonusCardType.Artillery })
+        foreach (var type in UnitTypes)
             if (nonWild.All(cardType => cardType == type))
-                options.Add(FixedThreeOfAKindValue(type));
+                options.Add(FixedThreeOfAKindValues[type]);
 
         // One of each: no type appears twice among the non-wild cards (wilds fill the missing types).
         if (nonWild.Distinct().Count() == nonWild.Count)
@@ -90,15 +125,6 @@ public static class CardTradeRules
             : throw new InvalidOperationException("The cards do not form a valid set.");
     }
 
-    private static int FixedThreeOfAKindValue(BonusCardType type) =>
-        type switch
-        {
-            BonusCardType.Infantry => 4,
-            BonusCardType.Cavalry => 6,
-            BonusCardType.Artillery => 8,
-            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Only unit types form three of a kind."),
-        };
-
     private static List<BonusCardType> NonWildTypes(IReadOnlyList<BonusCard> cards) =>
         cards.Where(card => card.Type != BonusCardType.Wild).Select(card => card.Type).ToList();
 }
@@ -108,3 +134,6 @@ public static class CardTradeRules
 /// <param name="BonusTerritoryId">The territory that got the territory bonus, or null when none was given.</param>
 /// <param name="BonusTroops">Troops placed directly on <paramref name="BonusTerritoryId"/> (0 when none).</param>
 public sealed record CardTradeResult(int ReserveTroops, Guid? BonusTerritoryId, int BonusTroops);
+
+/// <summary>A kind of set and the troops it gives.</summary>
+public sealed record CardSetValue(IReadOnlyList<BonusCardType> Types, int Troops);

@@ -136,6 +136,9 @@ public sealed class GameService(
 
     /// <summary>The game as the current user may see it under fog of war.</summary>
     private async Task<GameDetailResponse> ToResponseAsync(Game game, CancellationToken ct) =>
-        GameDetailResponse.From(game, await fogOfWar.VisibleToCurrentUserAsync(game, ct));
+        GameDetailResponse.From(
+            game,
+            await fogOfWar.VisibleToCurrentUserAsync(game, ct),
+            await forcedCardTrade.CurrentPlayerHandSizeAsync(game, ct));
 
 }

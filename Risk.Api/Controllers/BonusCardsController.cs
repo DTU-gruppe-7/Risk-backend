@@ -31,4 +31,18 @@ public sealed class BonusCardsController(BonusCardService cards) : ControllerBas
     public async Task<ActionResult<TradeCardsResponse>> Trade(
         Guid gameId, [FromBody] TradeCardsRequest request, CancellationToken ct)
         => Ok(await cards.TradeAsync(gameId, request, ct));
+
+    /// <summary>
+    /// Shows what trading the cards would give, without trading them. Works in any phase and for any
+    /// number of cards: anything but a valid set of three gives <c>isValid: false</c>.
+    /// </summary>
+    /// <response code="200">Preview returned.</response>
+    /// <response code="403">A card is not in the caller's hand.</response>
+    [HttpPost("trade-in/preview")]
+    [ProducesResponseType<TradePreviewResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TradePreviewResponse>> PreviewTrade(
+        Guid gameId, [FromBody] TradeCardsRequest request, CancellationToken ct)
+        => Ok(await cards.PreviewTradeAsync(gameId, request, ct));
 }

@@ -84,7 +84,8 @@ public class CardTradeTests
 
         Assert.Equal(4, first.ReserveTroops);
         Assert.Equal(4, second.ReserveTroops);
-        Assert.Equal(0, s.Game.BonusCardTradeCount);
+        // The value does not grow, but every trade is still counted (shown as cardSetsTraded).
+        Assert.Equal(2, s.Game.BonusCardTradeCount);
     }
 
     [Fact]
@@ -244,5 +245,106 @@ public class CardTradeTests
 
         Assert.Equal(s.Blue.Id, s.Game.CurrentPlayerId);
         Assert.False(s.Game.HasReceivedTerritoryBonusThisTurn);
+    }
+
+    // -------------------------------------------------------------------------
+    // Preview, upcoming values and the rules
+    // -------------------------------------------------------------------------
+
+    public static TheoryData<CardTradeMode, BonusCardType[]> PreviewHands => new()
+    {
+        { CardTradeMode.Progressive, [I, C, A] },
+        { CardTradeMode.Progressive, [I, I, W] },
+        { CardTradeMode.Fixed, [A, A, A] },
+        { CardTradeMode.Fixed, [C, W, C] },
+        { CardTradeMode.Fixed, [I, C, W] },
+    };
+
+    [Theory]
+    [MemberData(nameof(PreviewHands))]
+    public void The_preview_gives_exactly_what_the_trade_then_gives(CardTradeMode mode, BonusCardType[] types)
+    {
+        var s = Started(mode);
+        var owned = OwnedBy(s, s.Red);
+        var cards = Hand(s, (types[0], owned), (types[1], null), (types[2], null));
+
+        var preview = s.Game.PreviewCardTrade(s.Red.Id, cards);
+        var trade = s.Game.TradeBonusCards(s.Red.Id, cards);
+
+        Assert.Equal(trade, preview);
+        Assert.NotNull(preview!.BonusTerritoryId);
+    }
+
+    [Fact]
+    public void The_preview_changes_nothing()
+    {
+        var s = Started(CardTradeMode.Progressive);
+        var owned = TerritoryOf(s, OwnedBy(s, s.Red));
+        var cards = Hand(s, (I, owned.Identifier), (C, null), (A, null));
+        var (reserve, troops, version) = (s.Red.ReinforcementTroops, owned.TroopCount, s.Game.Version);
+
+        s.Game.PreviewCardTrade(s.Red.Id, cards);
+
+        Assert.All(cards, card => Assert.False(card.Used));
+        Assert.Equal(0, s.Game.BonusCardTradeCount);
+        Assert.Equal(reserve, s.Red.ReinforcementTroops);
+        Assert.Equal(troops, owned.TroopCount);
+        Assert.False(s.Game.HasReceivedTerritoryBonusThisTurn);
+        Assert.Equal(version, s.Game.Version);
+    }
+
+    [Fact]
+    public void The_preview_is_not_limited_to_the_deployment_phase()
+    {
+        var s = Started(CardTradeMode.Fixed);
+        s.Game.DeployTroops(s.Red.Id, TerritoryOf(s, OwnedBy(s, s.Red)), s.Red.ReinforcementTroops);
+        Assert.Equal(GamePhase.Attack, s.Game.CurrentPhase);
+
+        Assert.Equal(10, s.Game.PreviewCardTrade(s.Red.Id, Hand(s, I, C, A))!.ReserveTroops);
+    }
+
+    [Fact]
+    public void The_preview_is_null_for_anything_but_a_valid_set_of_three_own_cards()
+    {
+        var s = Started(CardTradeMode.Progressive);
+        var card = Hand(s, I)[0];
+
+        Assert.Null(s.Game.PreviewCardTrade(s.Red.Id, Hand(s, I, I)));
+        Assert.Null(s.Game.PreviewCardTrade(s.Red.Id, Hand(s, I, I, C)));
+        Assert.Null(s.Game.PreviewCardTrade(s.Red.Id, [card, card, card]));
+        Assert.Null(s.Game.PreviewCardTrade(s.Blue.Id, Hand(s, I, C, A)));
+    }
+
+    [Fact]
+    public void The_upcoming_values_move_on_by_one_after_a_progressive_trade()
+    {
+        var s = Started(CardTradeMode.Progressive);
+        Assert.Equal([4, 6, 8], s.Game.UpcomingCardTradeValues(3));
+
+        s.Game.TradeBonusCards(s.Red.Id, Hand(s, I, C, A));
+
+        Assert.Equal([6, 8, 10], s.Game.UpcomingCardTradeValues(3));
+    }
+
+    [Fact]
+    public void There_are_no_upcoming_values_in_fixed_mode()
+    {
+        var s = Started(CardTradeMode.Fixed);
+
+        Assert.Empty(s.Game.UpcomingCardTradeValues(3));
+    }
+
+    [Fact]
+    public void The_fixed_sets_list_every_set_without_wild_cards_and_match_the_values_traded()
+    {
+        Assert.Equal(
+            [(I, 4), (C, 6), (A, 8)],
+            CardTradeRules.FixedSets.Take(3).Select(set => (set.Types.Distinct().Single(), set.Troops)));
+        Assert.Equal([I, C, A], CardTradeRules.FixedSets[3].Types);
+        Assert.Equal(CardTradeRules.FixedOneOfEachValue, CardTradeRules.FixedSets[3].Troops);
+
+        var s = Started(CardTradeMode.Fixed);
+        Assert.All(CardTradeRules.FixedSets, set =>
+            Assert.Equal(set.Troops, CardTradeRules.SetValue(CardTradeMode.Fixed, Hand(s, set.Types.ToArray()), 0)));
     }
 }

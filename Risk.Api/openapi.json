@@ -409,6 +409,107 @@
         }
       }
     },
+    "/api/games/{gameId}/bonus-cards/trade-in/preview": {
+      "post": {
+        "tags": [
+          "BonusCards"
+        ],
+        "summary": "Shows what trading the cards would give, without trading them. Works in any phase and for any\r\nnumber of cards: anything but a valid set of three gives `isValid: false`.",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Preview returned.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A card is not in the caller's hand.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/games/{gameId}/gameplay/attack": {
       "post": {
         "tags": [
@@ -2274,6 +2375,36 @@
         }
       }
     },
+    "/api/rules/card-trades": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "The card trade rules: set values in both trade modes, the territory bonus and the forced trade.",
+        "responses": {
+          "200": {
+            "description": "Rules returned. They never change at runtime, so clients may cache them.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardTradeRulesResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardTradeRulesResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardTradeRulesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/games/{gameId}/territories": {
       "get": {
         "tags": [
@@ -3062,6 +3193,82 @@
       "CardTradeMode": {
         "type": "integer"
       },
+      "CardTradeRulesResponse": {
+        "required": [
+          "fixedSets",
+          "firstProgressiveValues",
+          "ownedTerritoryBonus",
+          "cardsPerTrade",
+          "forcedTradeHandSize"
+        ],
+        "type": "object",
+        "properties": {
+          "fixedSets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CardTradeSetResponse"
+            }
+          },
+          "firstProgressiveValues": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "ownedTerritoryBonus": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cardsPerTrade": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "forcedTradeHandSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CardTradeSetResponse": {
+        "required": [
+          "types",
+          "troops"
+        ],
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BonusCardType"
+            }
+          },
+          "troops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "ConquestRequest": {
         "required": [
           "fromTerritoryId",
@@ -3255,7 +3462,9 @@
           "endedAt",
           "turnStartedAt",
           "round",
-          "pendingConquest"
+          "pendingConquest",
+          "cardSetsTraded",
+          "upcomingTradeValues"
         ],
         "type": "object",
         "properties": {
@@ -3353,6 +3562,25 @@
                 "$ref": "#/components/schemas/PendingConquestResponse"
               }
             ]
+          },
+          "cardSetsTraded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "upcomingTradeValues": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
           }
         }
       },
@@ -3742,7 +3970,8 @@
           "color",
           "turnOrder",
           "reinforcementTroops",
-          "isEliminated"
+          "isEliminated",
+          "mustTradeCards"
         ],
         "type": "object",
         "properties": {
@@ -3777,6 +4006,9 @@
             "format": "int32"
           },
           "isEliminated": {
+            "type": "boolean"
+          },
+          "mustTradeCards": {
             "type": "boolean"
           }
         }
@@ -3930,6 +4162,44 @@
             ],
             "format": "int32",
             "default": 0
+          }
+        }
+      },
+      "TradePreviewResponse": {
+        "required": [
+          "isValid",
+          "troops",
+          "bonusTerritoryId",
+          "bonusTroops"
+        ],
+        "type": "object",
+        "properties": {
+          "isValid": {
+            "type": "boolean"
+          },
+          "troops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "bonusTerritoryId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "bonusTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -4113,6 +4383,9 @@
     },
     {
       "name": "Players"
+    },
+    {
+      "name": "Rules"
     },
     {
       "name": "Territories"

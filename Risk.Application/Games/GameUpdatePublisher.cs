@@ -17,7 +17,8 @@ namespace Risk.Application.Games;
 public sealed class GameUpdatePublisher(
     IGameRepository games,
     IMapRepository map,
-    IGameRealtime realtime)
+    IGameRealtime realtime,
+    ForcedCardTradeGuard forcedCardTrade)
 {
     public async Task PublishAsync(IReadOnlyCollection<Guid> gameIds, CancellationToken cancellationToken = default)
     {
@@ -31,14 +32,15 @@ public sealed class GameUpdatePublisher(
             if (await games.GetByIdWithDetailsAsync(gameId, cancellationToken) is not { } game)
                 continue;
 
+            var handSize = await forcedCardTrade.CurrentPlayerHandSizeAsync(game, cancellationToken);
             if (game.Settings?.HasFogOfWar != true)
             {
-                await realtime.SendToGameAsync(game.Id, Build(game, graph, viewerUserId: null));
+                await realtime.SendToGameAsync(game.Id, Build(game, graph, handSize, viewerUserId: null));
                 continue;
             }
 
             foreach (var userId in game.ParticipantUserIds)
-                await realtime.SendToUserInGameAsync(game.Id, userId, Build(game, graph, userId));
+                await realtime.SendToUserInGameAsync(game.Id, userId, Build(game, graph, handSize, userId));
         }
     }
 
@@ -49,15 +51,17 @@ public sealed class GameUpdatePublisher(
         var game = await games.GetByIdWithDetailsAsync(gameId, cancellationToken)
                    ?? throw new NotFoundException("Game", gameId);
         var graph = await map.GetGraphAsync(cancellationToken);
-        return Build(game, graph, userId);
+        var handSize = await forcedCardTrade.CurrentPlayerHandSizeAsync(game, cancellationToken);
+        return Build(game, graph, handSize, userId);
     }
 
-    private static GameUpdateMessage Build(Game game, MapGraph graph, Guid? viewerUserId)
+    /// <param name="currentPlayerHandSize">How many cards the player whose turn it is holds.</param>
+    private static GameUpdateMessage Build(Game game, MapGraph graph, int currentPlayerHandSize, Guid? viewerUserId)
     {
         var territories = game.Territories.OrderBy(territory => territory.Identifier);
         if (game.Settings?.HasFogOfWar != true)
             return new GameUpdateMessage(
-                GameDetailResponse.From(game, visibleTerritories: null),
+                GameDetailResponse.From(game, visibleTerritories: null, currentPlayerHandSize),
                 territories.Select(TerritoryResponse.From).ToList());
 
         var visible = viewerUserId is { } userId
@@ -65,7 +69,7 @@ public sealed class GameUpdatePublisher(
             : new HashSet<string>();
 
         return new GameUpdateMessage(
-            GameDetailResponse.From(game, visible),
+            GameDetailResponse.From(game, visible, currentPlayerHandSize),
             territories
                 .Where(territory => visible.Contains(territory.Identifier))
                 .Select(TerritoryResponse.From)

@@ -4,6 +4,7 @@ using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
+using Risk.Domain.Services;
 
 namespace Risk.Application.Cards;
 
@@ -29,21 +30,43 @@ public sealed class BonusCardService(
     {
         var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
         var player = access.RequireCurrentPlayer(game);
-        if (request.CardIds is null || request.CardIds.Count != 3 ||
-            request.CardIds.Distinct().Count() != 3)
+        if (request.CardIds is null || request.CardIds.Count != CardTradeRules.CardsPerTrade ||
+            request.CardIds.Distinct().Count() != CardTradeRules.CardsPerTrade)
             throw new DomainValidationException("Exactly three different cards must be traded.");
 
-        var hand = await cards.GetByPlayerIdAsync(gameId, player.Id, ct);
-        // Kept in request order: it decides which card's territory gets the territory bonus.
-        var selected = request.CardIds
-            .Select(id => hand.FirstOrDefault(card => card.Id == id))
-            .OfType<BonusCard>()
-            .ToList();
-        if (selected.Count != 3)
-            throw new ForbiddenException("All selected cards must belong to your hand.");
-
+        var selected = await CardsFromHandAsync(gameId, player.Id, request.CardIds, ct);
         var result = game.TradeBonusCards(player.Id, selected);
         await unitOfWork.SaveChangesAsync(ct);
         return new TradeCardsResponse(result.ReserveTroops, result.BonusTerritoryId, result.BonusTroops);
+    }
+
+    /// <summary>
+    /// What trading the cards would give, without saving anything. Runs the same calculation as
+    /// <see cref="TradeAsync"/>, but any number of cards may be sent and the phase is not checked.
+    /// </summary>
+    public async Task<TradePreviewResponse> PreviewTradeAsync(
+        Guid gameId, TradeCardsRequest request, CancellationToken ct = default)
+    {
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        var player = access.RequireCurrentPlayer(game);
+        var selected = await CardsFromHandAsync(gameId, player.Id, request.CardIds ?? [], ct);
+        return TradePreviewResponse.From(game.PreviewCardTrade(player.Id, selected));
+    }
+
+    /// <summary>
+    /// The player's cards with the given ids, kept in request order: it decides which card's territory
+    /// gets the territory bonus. Refuses ids that are not in the player's hand.
+    /// </summary>
+    private async Task<List<BonusCard>> CardsFromHandAsync(
+        Guid gameId, Guid playerId, IReadOnlyList<Guid> cardIds, CancellationToken ct)
+    {
+        var hand = await cards.GetByPlayerIdAsync(gameId, playerId, ct);
+        var selected = cardIds
+            .Select(id => hand.FirstOrDefault(card => card.Id == id))
+            .OfType<BonusCard>()
+            .ToList();
+        if (selected.Count != cardIds.Count)
+            throw new ForbiddenException("All selected cards must belong to your hand.");
+        return selected;
     }
 }

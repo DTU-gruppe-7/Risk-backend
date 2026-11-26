@@ -143,6 +143,26 @@ public class GameAndPlayerServiceTests
     }
 
     [Fact]
+    public async Task Getting_the_game_includes_the_card_trade_state()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+        game.ReturnToDeploymentForCardTrade();
+        for (var i = 0; i < Game.ForcedCardTradeThreshold; i++)
+        {
+            var card = new BonusCard(game.Id, BonusCardType.Wild);
+            card.AssignToPlayer(player.Id);
+            _bonusCards.Add(card);
+        }
+
+        var response = await _gameService.GetByIdAsync(game.Id);
+
+        Assert.Equal(0, response.CardSetsTraded);
+        Assert.Equal([4, 6, 8], response.UpcomingTradeValues);
+        Assert.True(response.Players.Single(p => p.Id == player.Id).MustTradeCards);
+        Assert.False(response.Players.Single(p => p.Id != player.Id).MustTradeCards);
+    }
+
+    [Fact]
     public async Task Unknown_game_is_not_found()
     {
         await Assert.ThrowsAsync<NotFoundException>(() => _gameService.GetByIdAsync(Guid.NewGuid()));

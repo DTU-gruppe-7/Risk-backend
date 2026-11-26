@@ -52,6 +52,7 @@ public sealed class Game
 
     /// <summary>The territory bonus for traded cards is given at most once per turn (official rule).</summary>
     public bool HasReceivedTerritoryBonusThisTurn { get; private set; }
+    /// <summary>Sets traded by all players so far, in both trade modes. Progressive set values are based on it.</summary>
     public int BonusCardTradeCount { get; private set; }
     public Guid? PendingConquestFromTerritoryId { get; private set; }
     public Guid? PendingConquestToTerritoryId { get; private set; }
@@ -255,36 +256,60 @@ public sealed class Game
         EnsureState(GameState.InProgress, "Cards can only be traded while the game is in progress.");
         if (CurrentPlayerId != playerId || CurrentPhase != GamePhase.Deployment)
             throw new BusinessRuleException("Cards can only be traded during the current player's Deployment phase.");
-        if (cards.Count != 3 || cards.Any(card => card.PlayerId != playerId || card.Used))
+        if (!IsOwnUnusedSet(playerId, cards))
             throw new BusinessRuleException("You must trade three unused cards from your own hand.");
         if (!CardTradeRules.IsValidSet(cards))
             throw new BusinessRuleException("The selected cards do not form a valid combination.");
 
-        var player = RequirePlayer(playerId);
-        var mode = Settings?.CardTradeMode ?? CardTradeMode.Progressive;
-        var troops = CardTradeRules.SetValue(mode, cards, BonusCardTradeCount);
-        if (mode == CardTradeMode.Progressive)
-            BonusCardTradeCount++;
-
-        var bonusTerritory = HasReceivedTerritoryBonusThisTurn
-            ? null
-            : CardTradeRules.TerritoryBonusTarget(cards, _territories, playerId);
-
+        var result = PreviewCardTrade(playerId, cards)!;
         foreach (var card in cards)
             card.MarkAsUsed();
-        player.AddTradeInReinforcements(troops);
-        if (bonusTerritory is not null)
+        RequirePlayer(playerId).AddTradeInReinforcements(result.ReserveTroops);
+        if (result.BonusTerritoryId is { } bonusTerritoryId)
         {
-            bonusTerritory.AddTroops(CardTradeRules.TerritoryBonusTroops);
+            _territories.Single(territory => territory.Id == bonusTerritoryId).AddTroops(result.BonusTroops);
             HasReceivedTerritoryBonusThisTurn = true;
         }
 
+        BonusCardTradeCount++;
         BumpVersion();
+        return result;
+    }
+
+    /// <summary>
+    /// What trading <paramref name="cards"/> would give the player now, without changing anything, or
+    /// null when they are not three unused cards from the player's hand forming a valid set. Not limited to
+    /// the player's Deployment phase, so a hand can be looked at any time; <see cref="TradeBonusCards"/>
+    /// uses the same calculation, so the preview and the real trade cannot differ.
+    /// </summary>
+    public CardTradeResult? PreviewCardTrade(Guid playerId, IReadOnlyList<BonusCard> cards)
+    {
+        if (!IsOwnUnusedSet(playerId, cards) || !CardTradeRules.IsValidSet(cards))
+            return null;
+
+        var mode = Settings?.CardTradeMode ?? CardTradeMode.Progressive;
+        var troops = CardTradeRules.SetValue(mode, cards, BonusCardTradeCount);
+
+        // The once-per-turn limit only concerns the turn under way; another player's preview looks ahead to their own.
+        var bonusAlreadyGiven = CurrentPlayerId == playerId && HasReceivedTerritoryBonusThisTurn;
+        var bonusTerritory = bonusAlreadyGiven
+            ? null
+            : CardTradeRules.TerritoryBonusTarget(cards, _territories, playerId);
+
         return new CardTradeResult(
             troops,
             bonusTerritory?.Id,
             bonusTerritory is null ? 0 : CardTradeRules.TerritoryBonusTroops);
     }
+
+    /// <summary>What the next sets traded in this game will give, the next one first (empty in fixed mode).</summary>
+    public IReadOnlyList<int> UpcomingCardTradeValues(int count) =>
+        CardTradeRules.UpcomingValues(Settings?.CardTradeMode ?? CardTradeMode.Progressive, BonusCardTradeCount, count);
+
+    private static bool IsOwnUnusedSet(Guid playerId, IReadOnlyList<BonusCard> cards) =>
+        cards.Count == CardTradeRules.CardsPerTrade &&
+        cards.Select(card => card.Id).Distinct().Count() == cards.Count &&
+        cards.All(card => card.PlayerId == playerId && !card.Used);
 
     public void EndPhase(Guid playerId, GamePhase expectedNextPhase, MapGraph map, DateTimeOffset now)
     {
@@ -613,10 +638,20 @@ public sealed class Game
     /// </summary>
     public void EnsureNoForcedCardTrade(int handSize)
     {
-        if (CurrentPhase == GamePhase.Deployment && handSize >= ForcedCardTradeThreshold)
+        if (HandForcesCardTrade(handSize))
             throw new BusinessRuleException(
                 "Players with five or more cards must trade in cards before continuing.");
     }
+
+    /// <summary>
+    /// Whether the player must trade cards before going on: it is their turn and
+    /// <see cref="EnsureNoForcedCardTrade"/> would refuse them.
+    /// </summary>
+    public bool MustTradeCards(Guid playerId, int handSize) =>
+        CurrentPlayerId == playerId && HandForcesCardTrade(handSize);
+
+    private bool HandForcesCardTrade(int handSize) =>
+        CurrentPhase == GamePhase.Deployment && handSize >= ForcedCardTradeThreshold;
 
     /// <summary>
     /// Sends the active player back to Deployment so they can trade in cards they took over

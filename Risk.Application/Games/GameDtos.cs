@@ -34,6 +34,11 @@ public sealed record GameSummaryResponse(
 /// <param name="TurnStartedAt">When the current player's turn started.</param>
 /// <param name="Round">Current round, starting at 1 (0 in the Lobby). Secret missions cannot win the game in round 1.</param>
 /// <param name="PendingConquest">A conquered territory waiting for troops to move in, or null when nothing is pending.</param>
+/// <param name="CardSetsTraded">Card sets traded by all players so far.</param>
+/// <param name="UpcomingTradeValues">
+/// What the next three card trades give, the next one first, with <see cref="CardTradeMode.Progressive"/>.
+/// Empty with <see cref="CardTradeMode.Fixed"/>, where the value depends on the cards.
+/// </param>
 public sealed record GameDetailResponse(
     Guid Id, long Version, Guid HostId, GameState State, Guid? WinnerId,
     Guid? CurrentPlayerId, GamePhase CurrentPhase,
@@ -41,18 +46,25 @@ public sealed record GameDetailResponse(
     IEnumerable<PlayerSummaryResponse> Players,
     DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt,
     DateTimeOffset? TurnStartedAt, int Round,
-    PendingConquestResponse? PendingConquest)
+    PendingConquestResponse? PendingConquest,
+    int CardSetsTraded, IReadOnlyList<int> UpcomingTradeValues)
 {
+    private const int UpcomingTradeValuesShown = 3;
+
     /// <param name="g">The game.</param>
     /// <param name="visibleTerritories">
     /// The territories the receiver may see under fog of war, or null when the game has no fog.
     /// </param>
-    internal static GameDetailResponse From(Game g, IReadOnlySet<string>? visibleTerritories) =>
+    /// <param name="currentPlayerHandSize">How many cards the player whose turn it is holds.</param>
+    internal static GameDetailResponse From(Game g, IReadOnlySet<string>? visibleTerritories, int currentPlayerHandSize) =>
         new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
-            g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
+            g.Players.OrderBy(p => p.TurnOrder)
+                .Select(p => PlayerSummaryResponse.From(p, g.MustTradeCards(p.Id, currentPlayerHandSize)))
+                .ToList(),
             g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt, g.Round,
-            PendingConquestResponse.For(g, visibleTerritories));
+            PendingConquestResponse.For(g, visibleTerritories),
+            g.BonusCardTradeCount, g.UpcomingCardTradeValues(UpcomingTradeValuesShown));
 }
 
 /// <summary>
@@ -115,11 +127,15 @@ public sealed record GameSettingResponse(
 
 /// <summary>Lightweight player summary embedded in game responses.</summary>
 /// <param name="UserName">The player's public in-game name. Requires <see cref="Player.User"/> to be loaded.</param>
+/// <param name="MustTradeCards">
+/// It is this player's turn and they hold so many cards that they must trade before going on.
+/// </param>
 public sealed record PlayerSummaryResponse(
-    Guid Id, Guid UserId, string UserName, string Color, int TurnOrder, int ReinforcementTroops, bool IsEliminated)
+    Guid Id, Guid UserId, string UserName, string Color, int TurnOrder, int ReinforcementTroops, bool IsEliminated,
+    bool MustTradeCards)
 {
-    internal static PlayerSummaryResponse From(Player p) =>
-        new(p.Id, p.UserId, UserNameOf(p), p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated);
+    internal static PlayerSummaryResponse From(Player p, bool mustTradeCards) =>
+        new(p.Id, p.UserId, UserNameOf(p), p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated, mustTradeCards);
 
     // Every repository query that builds game responses includes the user. The fallback only
     // matters for in-memory games in tests, which have no users.

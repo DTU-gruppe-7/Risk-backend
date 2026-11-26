@@ -30,7 +30,8 @@ public class GameUpdatePublisherTests
         var games = new FakeGameRepository();
         games.Add(game);
         var realtime = new FakeGameRealtime();
-        var publisher = new GameUpdatePublisher(games, new FakeMapRepository(), realtime);
+        var publisher = new GameUpdatePublisher(
+            games, new FakeMapRepository(), realtime, new ForcedCardTradeGuard(new FakeBonusCardRepository()));
         return new Setup(game, red, blue, redUser, blueUser, host, publisher, realtime);
     }
 

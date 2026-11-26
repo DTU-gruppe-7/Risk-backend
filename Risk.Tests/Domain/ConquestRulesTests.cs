@@ -200,6 +200,37 @@ public class ConquestRulesTests
             game.EnsureNoForcedCardTrade(handSize);
     }
 
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(9)]
+    public void MustTradeCards_is_true_exactly_when_the_current_player_would_be_refused(int handSize)
+    {
+        var s = InAttackPhase();
+        var refusedInAttack = Refused(s.Game, handSize);
+        Assert.False(refusedInAttack);
+        Assert.False(s.Game.MustTradeCards(s.Red.Id, handSize));
+
+        s.Game.ReturnToDeploymentForCardTrade();
+
+        Assert.Equal(Refused(s.Game, handSize), s.Game.MustTradeCards(s.Red.Id, handSize));
+        // Only the player whose turn it is can be made to trade.
+        Assert.False(s.Game.MustTradeCards(s.Blue.Id, handSize));
+    }
+
+    private static bool Refused(Game game, int handSize)
+    {
+        try
+        {
+            game.EnsureNoForcedCardTrade(handSize);
+            return false;
+        }
+        catch (BusinessRuleException)
+        {
+            return true;
+        }
+    }
+
     [Fact]
     public void A_big_hand_never_blocks_the_attack_phase()
     {
