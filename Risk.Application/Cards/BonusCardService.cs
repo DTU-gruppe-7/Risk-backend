@@ -2,6 +2,7 @@ using Risk.Application.Common;
 using Risk.Application.Exceptions;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
+using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
 
 namespace Risk.Application.Cards;
