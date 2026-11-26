@@ -46,7 +46,7 @@ public sealed class GameService(
             hasFogOfWar: request.HasFogOfWar ?? false,
             hasMissions: request.HasMissions ?? false,
             blizzardCount: request.BlizzardCount ?? 0,
-            victoryMode:   request.VictoryMode,
+            victoryMode: request.VictoryMode,
             cardTradeMode: request.CardTradeMode);
 
         games.Add(game);
