@@ -3454,6 +3454,12 @@
                 "$ref": "#/components/schemas/GameVictoryMode"
               }
             ]
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

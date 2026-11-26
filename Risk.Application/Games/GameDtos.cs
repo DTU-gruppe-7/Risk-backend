@@ -110,10 +110,13 @@ public sealed record PlayerSummaryResponse(
 /// <param name="HasFogOfWar">Enable fog-of-war. Default: false.</param>
 /// <param name="HasMissions">Enable secret mission cards. Default: false.</param>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. Default: 0 (off).</param>
+/// <param name="VictoryMode">How the game is won. Overrides HasMissions when set.</param>
+/// <param name="Color">When set, the host joins the game with this color in the same save,
+/// so a game is never left behind without its host. Default: the host is not a player yet.</param>
 public sealed record CreateGameRequest(
     int? MaxPlayers, int? Timer, int? TurnTimeLimit,
     bool? HasFogOfWar, bool? HasMissions, int? BlizzardCount = null,
-    GameVictoryMode? VictoryMode = null);
+    GameVictoryMode? VictoryMode = null, string? Color = null);
 
 /// <summary>Payload to fully replace game settings.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>

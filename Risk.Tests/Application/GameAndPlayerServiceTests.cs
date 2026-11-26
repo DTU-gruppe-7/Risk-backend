@@ -56,6 +56,26 @@ public class GameAndPlayerServiceTests
     }
 
     [Fact]
+    public async Task Create_with_a_color_also_joins_the_host_in_the_same_save()
+    {
+        var game = await _gameService.CreateAsync(
+            new CreateGameRequest(4, null, null, null, null, Color: "blue"));
+
+        var host = Assert.Single(game.Players);
+        Assert.Equal(_host, host.UserId);
+        Assert.Equal("blue", host.Color);
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task Create_without_a_color_leaves_the_game_empty()
+    {
+        var game = await CreateGameAsync();
+
+        Assert.Empty(game.Players);
+    }
+
+    [Fact]
     public async Task Only_the_host_can_start_the_game()
     {
         var game = await CreateGameAsync();
