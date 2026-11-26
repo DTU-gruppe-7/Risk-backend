@@ -70,8 +70,10 @@ public sealed class GameAccess(
     }
 
     public Player RequireCurrentPlayer(Game game) =>
-        game.FindPlayerByUser(currentUser.UserId)
-        ?? throw new ForbiddenException("You are not a player in this game.");
+        FindCurrentPlayer(game) ?? throw new ForbiddenException("You are not a player in this game.");
+
+    /// <summary>The current user's player in the game, or null for a host who only watches.</summary>
+    public Player? FindCurrentPlayer(Game game) => game.FindPlayerByUser(currentUser.UserId);
 
     /// <summary>The game, if the current user is its host.</summary>
     public async Task<Game> RequireHostAsync(Guid gameId, CancellationToken ct = default)

@@ -11,7 +11,8 @@ namespace Risk.Infrastructure.Persistence;
 /// <summary>
 /// Commits changes and then tells the clients watching a game about it. Changed games are read from
 /// the change tracker, so every use case (and the turn timeout worker) pushes updates without
-/// having to remember to.
+/// having to remember to. Bonus cards that got a new owner are read the same way, so the player who
+/// got them is told (<see cref="CardHandover"/>).
 /// </summary>
 public sealed class UnitOfWork(
     AppDbContext context,
@@ -19,12 +20,14 @@ public sealed class UnitOfWork(
     ILogger<UnitOfWork> logger) : IUnitOfWork
 {
     private readonly HashSet<Guid> _changedGameIds = [];
+    private readonly List<CardHandover> _cardHandovers = [];
     private bool _inTransaction;
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         // Must be read before saving: afterwards every entry is Unchanged.
         var changed = ChangedGameIds();
+        var handovers = CardHandovers();
         try
         {
             await context.SaveChangesAsync(cancellationToken);
@@ -36,6 +39,7 @@ public sealed class UnitOfWork(
         }
 
         _changedGameIds.UnionWith(changed);
+        _cardHandovers.AddRange(handovers);
         // Inside a transaction nothing is final until it commits.
         if (!_inTransaction)
             await PublishAsync(cancellationToken);
@@ -64,16 +68,26 @@ public sealed class UnitOfWork(
             .Where(id => id != Guid.Empty)
             .ToList();
 
+    /// <summary>Bonus cards about to get a new owner, with who held them before (null: the draw pile).</summary>
+    private List<CardHandover> CardHandovers() =>
+        context.ChangeTracker.Entries<BonusCard>()
+            .Where(entry => entry.State == EntityState.Modified && entry.Property(card => card.PlayerId).IsModified)
+            .Select(entry => new CardHandover(entry.Entity, entry.Property(card => card.PlayerId).OriginalValue))
+            .Where(handover => handover.Card.PlayerId is not null && handover.Card.PlayerId != handover.PreviousPlayerId)
+            .ToList();
+
     private async Task PublishAsync(CancellationToken cancellationToken)
     {
         if (_changedGameIds.Count == 0)
             return;
 
         var gameIds = _changedGameIds.ToList();
+        var handovers = _cardHandovers.ToList();
         _changedGameIds.Clear();
+        _cardHandovers.Clear();
         try
         {
-            await publisher.PublishAsync(gameIds, cancellationToken);
+            await publisher.PublishAsync(gameIds, handovers, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -99,6 +113,7 @@ public sealed class UnitOfWork(
             {
                 owner._inTransaction = false;
                 owner._changedGameIds.Clear();
+                owner._cardHandovers.Clear();
             }
             await inner.DisposeAsync();
         }

@@ -1,3 +1,4 @@
+using Risk.Application.Cards;
 using Risk.Application.Games;
 
 namespace Risk.Application.Interfaces.Services;
@@ -16,4 +17,7 @@ public interface IGameRealtime
 
     /// <summary>Sends a territory selection only to the given user's connections watching the game.</summary>
     Task SendSelectionToUserInGameAsync(Guid gameId, Guid userId, TerritorySelectionDto selection);
+
+    /// <summary>Tells the given user, and only them, which cards they just got.</summary>
+    Task SendCardsReceivedToUserInGameAsync(Guid gameId, Guid userId, CardsReceivedMessage received);
 }

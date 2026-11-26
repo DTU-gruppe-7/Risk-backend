@@ -10,14 +10,16 @@ namespace Risk.Api.Controllers;
 [Authorize]
 public sealed class BonusCardsController(BonusCardService cards) : ControllerBase
 {
-    /// <summary>Lists bonus cards in a game, optionally filtered by player.</summary>
+    /// <summary>The caller's own cards. Other players' hands and the draw pile are secret.</summary>
     /// <param name="gameId">Game ID.</param>
-    /// <param name="playerId">Optional: only return cards held by this player.</param>
+    /// <param name="playerId">Optional; if given it must be the caller's own player id.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <response code="200">Card list returned.</response>
+    /// <response code="200">The caller's cards (none for a host who only watches).</response>
+    /// <response code="403">Another player's cards were asked for.</response>
     /// <response code="404">Game not found.</response>
     [HttpGet]
     [ProducesResponseType<IEnumerable<BonusCardResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<BonusCardResponse>>> GetAll(Guid gameId, [FromQuery] Guid? playerId, CancellationToken ct)
         => Ok(await cards.GetAllAsync(gameId, playerId, ct));

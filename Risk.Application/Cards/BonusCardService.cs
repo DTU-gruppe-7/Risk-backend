@@ -12,16 +12,23 @@ namespace Risk.Application.Cards;
 public sealed class BonusCardService(
     IBonusCardRepository cards,
     IUnitOfWork unitOfWork,
-    GameAccess access,
-    FogOfWar fogOfWar)
+    GameAccess access)
 {
+    /// <summary>
+    /// The caller's own cards. Cards are secret, so nobody sees another player's hand or the draw pile,
+    /// with or without fog of war. A host who only watches has no cards.
+    /// </summary>
+    /// <param name="playerId">Optional; if given it must be the caller's own player.</param>
     public async Task<IReadOnlyList<BonusCardResponse>> GetAllAsync(Guid gameId, Guid? playerId, CancellationToken ct = default)
     {
         var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
-        if (fogOfWar.IsActive(game))
-            playerId = access.RequireCurrentPlayer(game).Id;
+        var me = access.FindCurrentPlayer(game);
+        if (playerId is { } requested && requested != me?.Id)
+            throw new ForbiddenException("You can only see your own cards.");
+        if (me is null)
+            return [];
 
-        var list = await cards.GetByGameIdAsync(gameId, playerId, ct);
+        var list = await cards.GetByGameIdAsync(gameId, me.Id, ct);
         return list.Select(BonusCardResponse.From).ToList();
     }
 

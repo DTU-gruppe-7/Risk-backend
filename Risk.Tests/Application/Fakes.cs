@@ -1,3 +1,4 @@
+using Risk.Application.Cards;
 using Risk.Application.Interfaces;
 using Risk.Application.Games;
 using Risk.Application.Interfaces.Repository;
@@ -158,6 +159,14 @@ internal sealed class FakeGameRealtime : IGameRealtime
     public Task SendSelectionToUserInGameAsync(Guid gameId, Guid userId, TerritorySelectionDto selection)
     {
         Selections.Add((gameId, userId, selection));
+        return Task.CompletedTask;
+    }
+
+    public List<(Guid GameId, Guid UserId, CardsReceivedMessage Received)> CardsReceived { get; } = [];
+
+    public Task SendCardsReceivedToUserInGameAsync(Guid gameId, Guid userId, CardsReceivedMessage received)
+    {
+        CardsReceived.Add((gameId, userId, received));
         return Task.CompletedTask;
     }
 }

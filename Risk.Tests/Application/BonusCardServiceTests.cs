@@ -27,7 +27,7 @@ public class BonusCardServiceTests
         var unitOfWork = new FakeUnitOfWork();
         var currentUser = new FakeCurrentUser(red.UserId);
         var service = new BonusCardService(
-            cards, unitOfWork, new GameAccess(games, currentUser), new FogOfWar(currentUser, new FakeMapRepository()));
+            cards, unitOfWork, new GameAccess(games, currentUser));
         return new Setup(game, red, cards, unitOfWork, service);
     }
 

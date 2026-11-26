@@ -4,6 +4,7 @@ using Risk.Application.Games;
 using Risk.Application.Players;
 using Risk.Application.Services;
 using Risk.Domain.Entities;
+using Risk.Domain.Map;
 
 namespace Risk.Tests.Application;
 
@@ -107,22 +108,45 @@ public class GameAndPlayerServiceTests
     }
 
     [Fact]
-    public async Task Ending_the_attack_phase_after_a_conquest_hands_out_the_conquest_card()
+    public async Task The_conquest_card_is_handed_out_when_the_turn_ends_not_when_the_attack_phase_ends()
     {
         var (game, player) = await StartGameInAttackPhaseAsync();
         game.RecordConquest(player.Id);
 
         await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+        Assert.Empty(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Deployment));
 
         Assert.Single(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+        Assert.NotEqual(player.Id, game.CurrentPlayerId);
     }
 
     [Fact]
-    public async Task Ending_the_attack_phase_without_a_conquest_hands_out_no_card()
+    public async Task Fortifying_ends_the_turn_and_hands_out_the_conquest_card()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+        game.RecordConquest(player.Id);
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+        var from = game.Territories.First(t =>
+            t.OwnerId == player.Id && t.TroopCount > 1 &&
+            ClassicMap.Graph.NeighborsOf(t.Identifier).Any(n => game.Territories.Single(o => o.Identifier == n).OwnerId == player.Id));
+        var to = game.Territories.First(t =>
+            t.OwnerId == player.Id && ClassicMap.Graph.NeighborsOf(from.Identifier).Contains(t.Identifier));
+
+        await _gameService.FortifyAsync(game.Id, new FortifyRequest(from.Id, to.Id, 1));
+
+        Assert.Single(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+        Assert.NotEqual(player.Id, game.CurrentPlayerId);
+    }
+
+    [Fact]
+    public async Task A_turn_without_a_conquest_hands_out_no_card()
     {
         var (game, player) = await StartGameInAttackPhaseAsync();
 
         await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Deployment));
 
         Assert.Empty(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
     }

@@ -68,6 +68,23 @@ public sealed record CardTradeRulesResponse(
 /// <summary>A kind of set and the troops it gives.</summary>
 public sealed record CardTradeSetResponse(IReadOnlyList<BonusCardType> Types, int Troops);
 
+/// <summary>
+/// Pushed over the game hub to the player who got new cards, and to nobody else: cards are secret.
+/// Sent once the change is saved.
+/// </summary>
+/// <param name="Cards">Only the new cards, not the whole hand.</param>
+public sealed record CardsReceivedMessage(Guid GameId, IReadOnlyList<BonusCardResponse> Cards, CardsReceivedReason Reason);
+
+/// <summary>Why a player got cards.</summary>
+public enum CardsReceivedReason
+{
+    /// <summary>The card for conquering a territory, drawn when the player's turn ended.</summary>
+    Conquest,
+
+    /// <summary>The cards of a player the receiver knocked out.</summary>
+    Elimination
+}
+
 /// <summary>A mission card.</summary>
 /// <param name="Id">Card ID.</param>
 /// <param name="GameId">Owning game.</param>

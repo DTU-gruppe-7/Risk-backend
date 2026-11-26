@@ -35,9 +35,8 @@ public sealed class TurnTimeoutService(
             if (game.State != GameState.InProgress)
                 continue;
 
-            // A turn that runs out before its attack phase was ended still gets the card it earned.
-            // In Fortify the card has already been handed out.
-            if (game.CurrentPhase != GamePhase.Fortify && game.CurrentPlayerId is { } playerId)
+            // The turn ends here, so it gets the card it earned, before the turn passes on.
+            if (game.CurrentPlayerId is { } playerId)
                 await conquestResolver.AwardConquestCardAsync(game, playerId, cancellationToken);
 
             if (game.AdvanceIfTurnTimedOut(graph, now, Random.Shared))

@@ -295,7 +295,7 @@ public class GameplayServiceTests
     // ---- The card earned by conquering -----------------------------------
 
     [Fact]
-    public async Task The_conquest_card_is_handed_out_when_the_attack_phase_ends_and_not_before()
+    public async Task The_attack_itself_hands_out_no_conquest_card_only_the_award_does()
     {
         var f = Create();
         f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));

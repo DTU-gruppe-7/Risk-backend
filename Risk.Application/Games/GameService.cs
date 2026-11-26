@@ -77,12 +77,8 @@ public sealed class GameService(
         var player = access.RequireCurrentPlayer(game);
         await forcedCardTrade.EnsureCompletedAsync(game, player.Id, ct);
 
+        await AwardConquestCardIfTurnEndsAsync(game, player.Id, ct);
         game.EndPhase(player.Id, request.Phase, graph, DateTimeOffset.UtcNow);
-
-        // The card for conquering is handed out as the attack phase ends. Cards can only be traded
-        // in Deployment, so the player cannot use it before their next turn.
-        if (game.CurrentPhase == GamePhase.Fortify)
-            await conquestResolver.AwardConquestCardAsync(game, player.Id, ct);
 
         await unitOfWork.SaveChangesAsync(ct);
         return await ToResponseAsync(game, ct);
@@ -98,9 +94,23 @@ public sealed class GameService(
         var to = game.Territories.FirstOrDefault(t => t.Id == request.ToTerritoryId)
                  ?? throw new NotFoundException("Destination territory", request.ToTerritoryId);
 
+        // Fortifying ends the turn.
+        await AwardConquestCardIfTurnEndsAsync(game, player.Id, ct);
         game.Fortify(player.Id, from, to, request.Troops, graph, DateTimeOffset.UtcNow);
         await unitOfWork.SaveChangesAsync(ct);
         return await ToResponseAsync(game, ct);
+    }
+
+    /// <summary>
+    /// The card for conquering is handed out when the turn ends (official rule), which happens from the
+    /// Fortify phase. It must be given before the turn passes on, while the game still knows whether the
+    /// player conquered. Only for the player whose turn it is, so anyone else gets the usual errors from
+    /// the game. If the action then fails, nothing is saved.
+    /// </summary>
+    private async Task AwardConquestCardIfTurnEndsAsync(Game game, Guid playerId, CancellationToken ct)
+    {
+        if (game.CurrentPhase == GamePhase.Fortify && game.CurrentPlayerId == playerId)
+            await conquestResolver.AwardConquestCardAsync(game, playerId, ct);
     }
 
     public async Task<GameSettingResponse> GetSettingsAsync(Guid id, CancellationToken ct = default)

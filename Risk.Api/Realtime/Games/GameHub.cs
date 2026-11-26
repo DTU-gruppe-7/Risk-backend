@@ -1,3 +1,4 @@
+using Risk.Application.Cards;
 using Risk.Application.Common;
 using Risk.Application.Games;
 
@@ -11,6 +12,9 @@ public interface IGameClient
 
     /// <summary>The current player's territory selection, as the receiver may see it. Never sent to the selecting user.</summary>
     Task SelectionChanged(TerritorySelectionDto selection);
+
+    /// <summary>The cards the receiver just got (for a conquest or from a player they knocked out). Only sent to the receiver.</summary>
+    Task CardsReceived(CardsReceivedMessage received);
 }
 
 /// <summary>

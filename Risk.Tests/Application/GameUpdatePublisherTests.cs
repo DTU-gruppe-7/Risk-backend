@@ -1,3 +1,4 @@
+using Risk.Application.Cards;
 using Risk.Application.Common;
 using Risk.Application.Exceptions;
 using Risk.Application.Games;
@@ -137,6 +138,42 @@ public class GameUpdatePublisherTests
         await s.Publisher.PublishAsync([s.Game.Id]);
 
         Assert.Null(Assert.Single(s.Realtime.ToGame).Update.Game.PendingConquest);
+    }
+
+    private static BonusCard CardFor(Setup s, Player owner)
+    {
+        var card = new BonusCard(s.Game.Id, BonusCardType.Infantry);
+        card.AssignToPlayer(owner.Id);
+        return card;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task New_cards_are_announced_to_their_receiver_only_with_the_reason(bool fog)
+    {
+        var s = Create(fog);
+        var drawn = CardFor(s, s.Red);
+        var taken = CardFor(s, s.Red);
+
+        await s.Publisher.PublishAsync(
+            [s.Game.Id], [new CardHandover(drawn, PreviousPlayerId: null), new CardHandover(taken, s.Blue.Id)]);
+
+        Assert.All(s.Realtime.CardsReceived, message => Assert.Equal(s.RedUser, message.UserId));
+        var byReason = s.Realtime.CardsReceived.ToDictionary(m => m.Received.Reason, m => m.Received);
+        Assert.Equal([drawn.Id], byReason[CardsReceivedReason.Conquest].Cards.Select(c => c.Id));
+        Assert.Equal([taken.Id], byReason[CardsReceivedReason.Elimination].Cards.Select(c => c.Id));
+        Assert.All(byReason.Values, message => Assert.Equal(s.Game.Id, message.GameId));
+    }
+
+    [Fact]
+    public async Task Nothing_is_announced_when_no_card_changed_hands()
+    {
+        var s = Create(fog: false);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        Assert.Empty(s.Realtime.CardsReceived);
     }
 
     [Fact]
