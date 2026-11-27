@@ -17,6 +17,10 @@ public sealed class GameAccess(
     public async Task<Game> RequireGameAsync(Guid gameId, CancellationToken ct = default) =>
         await games.GetAsync(gameId, ct) ?? throw new NotFoundException("Game", gameId);
 
+    /// <summary>The game with its players and territories, for responses that need the board.</summary>
+    public async Task<Game> RequireGameWithDetailsAsync(Guid gameId, CancellationToken ct = default) =>
+        await games.GetByIdWithDetailsAsync(gameId, ct) ?? throw new NotFoundException("Game", gameId);
+
     public async Task EnsureGameExistsAsync(Guid gameId, CancellationToken ct = default)
     {
         if (!await games.ExistsAsync(gameId, ct))
@@ -41,16 +45,35 @@ public sealed class GameAccess(
 
     public async Task<Game> RequireParticipantWithDetailsAsync(Guid gameId, CancellationToken ct = default)
     {
-        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
-                   ?? throw new NotFoundException("Game", gameId);
+        var game = await RequireGameWithDetailsAsync(gameId, ct);
         if (!game.HasParticipant(currentUser.UserId))
             throw new ForbiddenException("You are not part of this game.");
         return game;
     }
 
+    /// <summary>
+    /// The game (with details) and the given user's player, if the game is in progress and it is
+    /// that player's turn. For callers that know the user without an HTTP request, such as realtime hubs.
+    /// </summary>
+    public async Task<(Game Game, Player Player)> RequireCurrentTurnAsync(
+        Guid gameId, Guid userId, CancellationToken ct = default)
+    {
+        var game = await RequireGameWithDetailsAsync(gameId, ct);
+        var player = game.FindPlayerByUser(userId)
+                     ?? throw new ForbiddenException("You are not a player in this game.");
+        if (player.IsEliminated)
+            throw new ForbiddenException("You have been eliminated from this game.");
+        if (game.State != GameState.InProgress)
+            throw new BusinessRuleException("The game is not in progress.");
+        game.EnsureCurrentTurn(player.Id);
+        return (game, player);
+    }
+
     public Player RequireCurrentPlayer(Game game) =>
-        game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)
-        ?? throw new ForbiddenException("You are not a player in this game.");
+        FindCurrentPlayer(game) ?? throw new ForbiddenException("You are not a player in this game.");
+
+    /// <summary>The current user's player in the game, or null for a host who only watches.</summary>
+    public Player? FindCurrentPlayer(Game game) => game.FindPlayerByUser(currentUser.UserId);
 
     /// <summary>The game, if the current user is its host.</summary>
     public async Task<Game> RequireHostAsync(Guid gameId, CancellationToken ct = default)
@@ -63,8 +86,7 @@ public sealed class GameAccess(
 
     public async Task<Game> RequireHostWithDetailsAsync(Guid gameId, CancellationToken ct = default)
     {
-        var game = await games.GetByIdWithDetailsAsync(gameId, ct)
-                   ?? throw new NotFoundException("Game", gameId);
+        var game = await RequireGameWithDetailsAsync(gameId, ct);
         if (!game.IsHost(currentUser.UserId))
             throw new ForbiddenException("Only the host can do this.");
         return game;

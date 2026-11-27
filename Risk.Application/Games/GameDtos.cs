@@ -32,27 +32,62 @@ public sealed record GameSummaryResponse(
 /// <param name="StartedAt">When the game started (null if not yet started).</param>
 /// <param name="EndedAt">When the game ended (null if not finished).</param>
 /// <param name="TurnStartedAt">When the current player's turn started.</param>
+/// <param name="Round">Current round, starting at 1 (0 in the Lobby). Secret missions cannot win the game in round 1.</param>
+/// <param name="PendingConquest">A conquered territory waiting for troops to move in, or null when nothing is pending.</param>
+/// <param name="CardSetsTraded">Card sets traded by all players so far.</param>
+/// <param name="UpcomingTradeValues">
+/// What the next three card trades give, the next one first, with <see cref="CardTradeMode.Progressive"/>.
+/// Empty with <see cref="CardTradeMode.Fixed"/>, where the value depends on the cards.
+/// </param>
 public sealed record GameDetailResponse(
     Guid Id, long Version, Guid HostId, GameState State, Guid? WinnerId,
     Guid? CurrentPlayerId, GamePhase CurrentPhase,
     GameSettingResponse? Settings,
     IEnumerable<PlayerSummaryResponse> Players,
     DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt,
-    DateTimeOffset? TurnStartedAt)
+    DateTimeOffset? TurnStartedAt, int Round,
+    PendingConquestResponse? PendingConquest,
+    int CardSetsTraded, IReadOnlyList<int> UpcomingTradeValues)
 {
-    internal static GameDetailResponse From(Game g) =>
-        new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
-            g.Settings is null ? null : GameSettingResponse.From(g.Settings),
-            g.Players.OrderBy(p => p.TurnOrder).Select(PlayerSummaryResponse.From).ToList(),
-            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
+    private const int UpcomingTradeValuesShown = 3;
 
-    internal static GameDetailResponse From(Game g, Guid? viewerPlayerId) =>
+    /// <param name="g">The game.</param>
+    /// <param name="visibleTerritories">
+    /// The territories the receiver may see under fog of war, or null when the game has no fog.
+    /// </param>
+    /// <param name="currentPlayerHandSize">How many cards the player whose turn it is holds.</param>
+    internal static GameDetailResponse From(Game g, IReadOnlySet<string>? visibleTerritories, int currentPlayerHandSize) =>
         new(g.Id, g.Version, g.HostId, g.State, g.WinnerId, g.CurrentPlayerId, g.CurrentPhase,
             g.Settings is null ? null : GameSettingResponse.From(g.Settings),
             g.Players.OrderBy(p => p.TurnOrder)
-                .Select(p => PlayerSummaryResponse.From(p, viewerPlayerId))
+                .Select(p => PlayerSummaryResponse.From(p, g.MustTradeCards(p.Id, currentPlayerHandSize)))
                 .ToList(),
-            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt);
+            g.CreatedAt, g.StartedAt, g.EndedAt, g.TurnStartedAt, g.Round,
+            PendingConquestResponse.For(g, visibleTerritories),
+            g.BonusCardTradeCount, g.UpcomingCardTradeValues(UpcomingTradeValuesShown));
+}
+
+/// <summary>
+/// A conquered territory waiting for the attacker to move troops in (<c>POST …/gameplay/conquest</c>).
+/// Ids are territory state ids (<see cref="TerritoryResponse.Id"/>).
+/// </summary>
+/// <param name="FromTerritoryId">The territory that attacked.</param>
+/// <param name="ToTerritoryId">The conquered territory, waiting for troops.</param>
+/// <param name="MinTroops">The fewest troops that must move in.</param>
+/// <param name="MaxTroops">The most troops that may move in.</param>
+public sealed record PendingConquestResponse(Guid FromTerritoryId, Guid ToTerritoryId, int MinTroops, int MaxTroops)
+{
+    /// <summary>Null when nothing is pending, or under fog of war when the receiver cannot see both territories.</summary>
+    internal static PendingConquestResponse? For(Game game, IReadOnlySet<string>? visibleTerritories)
+    {
+        if (game.FindPendingConquest() is not { } pending)
+            return null;
+        if (visibleTerritories is not null &&
+            !(visibleTerritories.Contains(pending.From.Identifier) && visibleTerritories.Contains(pending.To.Identifier)))
+            return null;
+
+        return new PendingConquestResponse(pending.From.Id, pending.To.Id, pending.MinTroops, pending.MaxTroops);
+    }
 }
 
 /// <summary>
@@ -63,29 +98,44 @@ public sealed record GameDetailResponse(
 /// <param name="Territories">The territories the receiver may see, ordered by identifier.</param>
 public sealed record GameUpdateMessage(GameDetailResponse Game, IReadOnlyList<TerritoryResponse> Territories);
 
+/// <summary>
+/// The territories the current player has picked, sent over the game hub as a visual hint for the
+/// other players. Ids are territory state ids (<see cref="TerritoryResponse.Id"/>). Both null clears the selection.
+/// </summary>
+public sealed record SelectTerritoriesRequest(Guid? SourceTerritoryId, Guid? TargetTerritoryId);
+
+/// <summary>
+/// Pushed over the game hub when the current player's selection changes. Under fog of war a territory
+/// the receiver cannot see is sent as null.
+/// </summary>
+/// <param name="PlayerId">The selecting player's id (<see cref="PlayerSummaryResponse.Id"/>), not the user id.</param>
+public sealed record TerritorySelectionDto(
+    Guid GameId, Guid PlayerId, Guid? SourceTerritoryId, Guid? TargetTerritoryId);
+
 /// <summary>Game configuration snapshot.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
+/// <param name="CardTradeMode">How traded bonus card sets are valued: Progressive or Fixed.</param>
 public sealed record GameSettingResponse(
     Guid Id, Guid GameId, int MaxPlayers, int Timer,
     int TurnTimeLimit, bool HasFogOfWar, bool HasMissions, GameVictoryMode VictoryMode,
-    int BlizzardCount)
+    int BlizzardCount, CardTradeMode CardTradeMode)
 {
     internal static GameSettingResponse From(GameSetting s) =>
         new(s.Id, s.GameId, s.MaxPlayers, s.Timer, s.TurnTimeLimit, s.HasFogOfWar,
-            s.HasMissions, s.VictoryMode, s.BlizzardCount);
+            s.HasMissions, s.VictoryMode, s.BlizzardCount, s.CardTradeMode);
 }
 
 /// <summary>Lightweight player summary embedded in game responses.</summary>
 /// <param name="UserName">The player's public in-game name. Requires <see cref="Player.User"/> to be loaded.</param>
+/// <param name="MustTradeCards">
+/// It is this player's turn and they hold so many cards that they must trade before going on.
+/// </param>
 public sealed record PlayerSummaryResponse(
-    Guid Id, Guid UserId, string UserName, string Color, int TurnOrder, int ReinforcementTroops, bool IsEliminated)
+    Guid Id, Guid UserId, string UserName, string Color, int TurnOrder, int ReinforcementTroops, bool IsEliminated,
+    bool MustTradeCards)
 {
-    internal static PlayerSummaryResponse From(Player p) =>
-        new(p.Id, p.UserId, UserNameOf(p), p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated);
-
-    internal static PlayerSummaryResponse From(Player p, Guid? viewerPlayerId) =>
-        new(p.Id, p.UserId, UserNameOf(p), p.Color, p.TurnOrder,
-            viewerPlayerId == p.Id ? p.ReinforcementTroops : 0, p.IsEliminated);
+    internal static PlayerSummaryResponse From(Player p, bool mustTradeCards) =>
+        new(p.Id, p.UserId, UserNameOf(p), p.Color, p.TurnOrder, p.ReinforcementTroops, p.IsEliminated, mustTradeCards);
 
     // Every repository query that builds game responses includes the user. The fallback only
     // matters for in-memory games in tests, which have no users.
@@ -99,17 +149,21 @@ public sealed record PlayerSummaryResponse(
 /// <param name="HasFogOfWar">Enable fog-of-war. Default: false.</param>
 /// <param name="HasMissions">Enable secret mission cards. Default: false.</param>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. Default: 0 (off).</param>
+/// <param name="CardTradeMode">How traded bonus card sets are valued. Default: Progressive.</param>
 public sealed record CreateGameRequest(
     int? MaxPlayers, int? Timer, int? TurnTimeLimit,
     bool? HasFogOfWar, bool? HasMissions, int? BlizzardCount = null,
-    GameVictoryMode? VictoryMode = null);
+    GameVictoryMode? VictoryMode = null,
+    CardTradeMode? CardTradeMode = null);
 
 /// <summary>Payload to fully replace game settings.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
+/// <param name="CardTradeMode">How traded bonus card sets are valued. Default: Progressive.</param>
 public sealed record UpdateGameSettingRequest(
     int MaxPlayers, int Timer, int TurnTimeLimit,
     bool HasFogOfWar, bool HasMissions, int BlizzardCount = 0,
-    GameVictoryMode? VictoryMode = null);
+    GameVictoryMode? VictoryMode = null,
+    CardTradeMode? CardTradeMode = null);
 
 /// <summary>Payload to change the current game phase.</summary>
 /// <param name="Phase">New phase.</param>

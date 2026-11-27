@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<MissionCardService>();
         services.AddScoped<TurnTimeoutService>();
         services.AddScoped<GameUpdatePublisher>();
+        services.AddScoped<TerritorySelectionService>();
 
 
         return services;

@@ -3,6 +3,8 @@ using Risk.Application.Services;
 using Risk.Domain.Entities;
 using Risk.Domain.Map;
 
+using Risk.Tests.Domain;
+
 namespace Risk.Tests.Application;
 
 public class TurnTimeoutServiceTests
@@ -29,7 +31,7 @@ public class TurnTimeoutServiceTests
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         var green = threePlayers ? game.AddPlayer(Guid.NewGuid(), "green") : null;
         game.ConfigureSettings(6, 0, 10, false, false);
-        game.Start(ClassicMap.Graph, new Random(1));
+        game.StartInJoinOrder(ClassicMap.Graph);
 
         var from = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, from, red.ReinforcementTroops);
@@ -101,6 +103,20 @@ public class TurnTimeoutServiceTests
         await f.Service.AdvanceTimedOutTurnsAsync(f.TimedOutAt);
 
         Assert.Single(await f.BonusCards.GetByPlayerIdAsync(f.Game.Id, f.Red.Id));
+    }
+
+    [Fact]
+    public async Task A_turn_that_times_out_in_the_fortify_phase_gets_its_conquest_card_too()
+    {
+        var f = Create(pending: false);
+        f.Game.RecordConquest(f.Red.Id);
+        f.Game.EndPhase(f.Red.Id, GamePhase.Fortify, ClassicMap.Graph, DateTimeOffset.UtcNow);
+        f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));
+
+        await f.Service.AdvanceTimedOutTurnsAsync(f.TimedOutAt);
+
+        Assert.Single(await f.BonusCards.GetByPlayerIdAsync(f.Game.Id, f.Red.Id));
+        Assert.Equal(f.Blue.Id, f.Game.CurrentPlayerId);
     }
 
     [Fact]

@@ -19,7 +19,7 @@ public class ConquestRulesTests
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         if (turnTimeLimit > 0)
             game.ConfigureSettings(6, 0, turnTimeLimit, false, false);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         var from = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, from, red.ReinforcementTroops);
@@ -94,6 +94,42 @@ public class ConquestRulesTests
     }
 
     [Fact]
+    public void The_pending_conquest_names_both_territories_and_how_many_troops_may_move_in()
+    {
+        var s = InAttackPhase();
+        Assert.Null(s.Game.FindPendingConquest());
+
+        Defeat(s.To);
+        s.Game.BeginPendingConquest(s.Red.Id, s.From, s.To);
+
+        var pending = s.Game.FindPendingConquest();
+        Assert.NotNull(pending);
+        Assert.Same(s.From, pending.From);
+        Assert.Same(s.To, pending.To);
+        Assert.Equal(1, pending.MinTroops);
+        Assert.Equal(s.From.TroopCount - 1, pending.MaxTroops);
+    }
+
+    [Fact]
+    public void The_pending_conquest_limits_are_exactly_what_completing_accepts()
+    {
+        var s = InAttackPhase();
+        Defeat(s.To);
+        s.Game.BeginPendingConquest(s.Red.Id, s.From, s.To);
+        var pending = s.Game.FindPendingConquest()!;
+
+        Assert.Throws<BusinessRuleException>(() =>
+            s.Game.CompletePendingConquest(s.Red.Id, s.From, s.To, pending.MinTroops - 1));
+        Assert.Throws<BusinessRuleException>(() =>
+            s.Game.CompletePendingConquest(s.Red.Id, s.From, s.To, pending.MaxTroops + 1));
+
+        s.Game.CompletePendingConquest(s.Red.Id, s.From, s.To, pending.MaxTroops);
+
+        Assert.Equal(pending.MaxTroops, s.To.TroopCount);
+        Assert.Null(s.Game.FindPendingConquest());
+    }
+
+    [Fact]
     public void Completing_a_pending_conquest_moves_the_troops_and_clears_the_pending_state()
     {
         var s = InAttackPhase();
@@ -155,13 +191,44 @@ public class ConquestRulesTests
         var game = new Game(Guid.NewGuid());
         game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
 
         if (blocked)
             Assert.Throws<BusinessRuleException>(() => game.EnsureNoForcedCardTrade(handSize));
         else
             game.EnsureNoForcedCardTrade(handSize);
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(9)]
+    public void MustTradeCards_is_true_exactly_when_the_current_player_would_be_refused(int handSize)
+    {
+        var s = InAttackPhase();
+        var refusedInAttack = Refused(s.Game, handSize);
+        Assert.False(refusedInAttack);
+        Assert.False(s.Game.MustTradeCards(s.Red.Id, handSize));
+
+        s.Game.ReturnToDeploymentForCardTrade();
+
+        Assert.Equal(Refused(s.Game, handSize), s.Game.MustTradeCards(s.Red.Id, handSize));
+        // Only the player whose turn it is can be made to trade.
+        Assert.False(s.Game.MustTradeCards(s.Blue.Id, handSize));
+    }
+
+    private static bool Refused(Game game, int handSize)
+    {
+        try
+        {
+            game.EnsureNoForcedCardTrade(handSize);
+            return false;
+        }
+        catch (BusinessRuleException)
+        {
+            return true;
+        }
     }
 
     [Fact]
@@ -189,7 +256,7 @@ public class ConquestRulesTests
         var game = new Game(Guid.NewGuid());
         game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Throws<BusinessRuleException>(game.ReturnToDeploymentForCardTrade);
     }
@@ -239,7 +306,7 @@ public class ConquestRulesTests
         s.Game.BeginPendingConquest(s.Red.Id, s.From, s.To);
 
         Assert.Throws<BusinessRuleException>(() =>
-            s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10)));
+            s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10), new Random(1)));
     }
 
     [Fact]
@@ -259,7 +326,7 @@ public class ConquestRulesTests
         var s = InAttackPhase(turnTimeLimit: 10);
         var fromBefore = s.From.TroopCount;
 
-        var advanced = s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10));
+        var advanced = s.Game.AdvanceIfTurnTimedOut(Map, s.Game.TurnStartedAt!.Value.AddSeconds(10), new Random(1));
 
         Assert.True(advanced);
         Assert.Equal(fromBefore, s.From.TroopCount);
