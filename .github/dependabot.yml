@@ -17,6 +17,18 @@ updates:
       # Microsoft.AspNetCore.OpenApi 10 kræver Microsoft.OpenApi 2.x
       - dependency-name: "Microsoft.OpenApi"
         update-types: ["version-update:semver-major"]
+      # Projektet kører .NET 10: major-versioner af disse pakker følger .NET (11.x kræver .NET 11).
+      # Opgraderes samlet sammen med TargetFramework, ikke af Dependabot.
+      - dependency-name: "Microsoft.AspNetCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Npgsql.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dotnet-ef"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: /
