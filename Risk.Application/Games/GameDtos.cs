@@ -10,13 +10,24 @@ namespace Risk.Application.Games;
 /// <param name="WinnerId">Winning player ID, or null until a player wins.</param>
 /// <param name="PlayerCount">Number of players currently in the game.</param>
 /// <param name="MaxPlayers">Maximum players allowed (from settings).</param>
+/// <param name="HasFogOfWar">Whether fog-of-war is enabled. False if the game has no settings.</param>
+/// <param name="VictoryMode">How the game is won. CompleteConquest if the game has no settings.</param>
+/// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off, also if the game has no settings.</param>
+/// <param name="TurnTimeLimit">Per-turn time limit in seconds. 0 = unlimited, also if the game has no settings.</param>
 /// <param name="CreatedAt">When the game was created.</param>
+/// <param name="Players">Players in the game, ordered by turn order. Lets the lobby show who has joined and which colors are taken.</param>
 public sealed record GameSummaryResponse(
     Guid Id, Guid HostId, GameState State,
-    int PlayerCount, int MaxPlayers, DateTimeOffset CreatedAt)
+    int PlayerCount, int MaxPlayers, bool HasFogOfWar, GameVictoryMode VictoryMode, int BlizzardCount, int TurnTimeLimit, DateTimeOffset CreatedAt,
+    IReadOnlyList<LobbyPlayerResponse> Players)
 {
     internal static GameSummaryResponse From(Game g) =>
-        new(g.Id, g.HostId, g.State, g.Players.Count, g.MaxPlayers, g.CreatedAt);
+        new(g.Id, g.HostId, g.State, g.Players.Count, g.MaxPlayers, g.Settings?.HasFogOfWar ?? false, g.Settings?.VictoryMode ?? GameVictoryMode.CompleteConquest, g.Settings?.BlizzardCount ?? 0, g.Settings?.TurnTimeLimit ?? 0,
+        g.CreatedAt,
+            g.Players
+                .OrderBy(p => p.TurnOrder)
+                .Select(LobbyPlayerResponse.From)
+                .ToList());
 }
 
 /// <summary>Full game details including settings and players.</summary>
@@ -149,12 +160,15 @@ public sealed record PlayerSummaryResponse(
 /// <param name="HasFogOfWar">Enable fog-of-war. Default: false.</param>
 /// <param name="HasMissions">Enable secret mission cards. Default: false.</param>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. Default: 0 (off).</param>
+/// <param name="VictoryMode">How the game is won. Overrides HasMissions when set.</param>
+/// <param name="Color">When set, the host joins the game with this color in the same save,
+/// so a game is never left behind without its host. Default: the host is not a player yet.</param>
 /// <param name="CardTradeMode">How traded bonus card sets are valued. Default: Progressive.</param>
 public sealed record CreateGameRequest(
     int? MaxPlayers, int? Timer, int? TurnTimeLimit,
     bool? HasFogOfWar, bool? HasMissions, int? BlizzardCount = null,
     GameVictoryMode? VictoryMode = null,
-    CardTradeMode? CardTradeMode = null);
+    string? Color = null, CardTradeMode? CardTradeMode = null);
 
 /// <summary>Payload to fully replace game settings.</summary>
 /// <param name="BlizzardCount">Blizzard mode: territories made impassable at start. 0 = off.</param>
@@ -171,3 +185,13 @@ public sealed record SetPhaseRequest(GamePhase Phase);
 
 /// <summary>Payload to move troops during the current player's Fortify phase.</summary>
 public sealed record FortifyRequest(Guid FromTerritoryId, Guid ToTerritoryId, int Troops);
+
+/// <summary>Minimal player info embedded in the game list.</summary>
+/// <param name="Id">Player ID.</param>
+/// <param name="UserId">Domain user ID of the player.</param>
+/// <param name="Color">The player's color.</param>
+public sealed record LobbyPlayerResponse(Guid Id, Guid UserId, string Color)
+{
+    internal static LobbyPlayerResponse From(Player p) =>
+        new(p.Id, p.UserId, p.Color);
+}

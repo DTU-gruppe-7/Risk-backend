@@ -35,7 +35,7 @@ public sealed class GameService(
         return await ToResponseAsync(game, ct);
     }
 
-    /// <summary>Creates a new game. The caller becomes host.</summary>
+    /// <summary>Creates a new game. The caller becomes host, and joins it too if a color is given.</summary>
     public async Task<GameDetailResponse> CreateAsync(CreateGameRequest request, CancellationToken ct = default)
     {
         var game = new Game(currentUser.UserId);
@@ -48,6 +48,10 @@ public sealed class GameService(
             blizzardCount: request.BlizzardCount ?? 0,
             victoryMode: request.VictoryMode,
             cardTradeMode: request.CardTradeMode);
+
+        // Joining in the same save as the create: either both happen or neither does.
+        if (!string.IsNullOrWhiteSpace(request.Color))
+            game.AddPlayer(currentUser.UserId, request.Color);
 
         games.Add(game);
         await unitOfWork.SaveChangesAsync(ct);
