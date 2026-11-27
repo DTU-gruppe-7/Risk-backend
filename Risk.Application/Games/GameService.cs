@@ -40,13 +40,13 @@ public sealed class GameService(
     {
         var game = new Game(currentUser.UserId);
         game.ConfigureSettings(
-            maxPlayers:    request.MaxPlayers ?? GameSetting.DefaultMaxPlayers,
-            timer:         request.Timer ?? 0,
+            maxPlayers: request.MaxPlayers ?? GameSetting.DefaultMaxPlayers,
+            timer: request.Timer ?? 0,
             turnTimeLimit: request.TurnTimeLimit ?? 0,
-            hasFogOfWar:   request.HasFogOfWar ?? false,
-            hasMissions:   request.HasMissions ?? false,
+            hasFogOfWar: request.HasFogOfWar ?? false,
+            hasMissions: request.HasMissions ?? false,
             blizzardCount: request.BlizzardCount ?? 0,
-            victoryMode:   request.VictoryMode);
+            victoryMode: request.VictoryMode);
 
         // Joining in the same save as the create: either both happen or neither does.
         if (!string.IsNullOrWhiteSpace(request.Color))

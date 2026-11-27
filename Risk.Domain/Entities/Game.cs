@@ -122,7 +122,7 @@ public sealed class Game
     // Game flow
     // -------------------------------------------------------------------------
 
-   /// <summary>
+    /// <summary>
     /// Starts the game, lays out the board and distributes playable territories between
     /// the players, with <see cref="GameSetting.BlizzardCount"/> of them turned into blizzards.
     /// </summary>

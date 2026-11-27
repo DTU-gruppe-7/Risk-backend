@@ -22,7 +22,7 @@ public sealed record GameSummaryResponse(
     IReadOnlyList<LobbyPlayerResponse> Players)
 {
     internal static GameSummaryResponse From(Game g) =>
-        new(g.Id, g.HostId, g.State, g.Players.Count, g.MaxPlayers, g.Settings?.HasFogOfWar ?? false, g.Settings?.VictoryMode ?? GameVictoryMode.CompleteConquest, g.Settings?.BlizzardCount ?? 0, g.Settings?.TurnTimeLimit ?? 0, 
+        new(g.Id, g.HostId, g.State, g.Players.Count, g.MaxPlayers, g.Settings?.HasFogOfWar ?? false, g.Settings?.VictoryMode ?? GameVictoryMode.CompleteConquest, g.Settings?.BlizzardCount ?? 0, g.Settings?.TurnTimeLimit ?? 0,
         g.CreatedAt,
             g.Players
                 .OrderBy(p => p.TurnOrder)
