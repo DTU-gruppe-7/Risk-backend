@@ -5,7 +5,7 @@ namespace Risk.Application.Auth;
 /// <summary>Payload required to create a new account.</summary>
 /// <param name="UserName">Publicly visible name shown in-game.</param>
 /// <param name="Email">Email address used for login.</param>
-/// <param name="Password">Must satisfy the configured password policy (min 12 chars).</param>
+/// <param name="Password">Must satisfy the configured password policy (min 15 chars, common passwords are rejected).</param>
 public sealed record RegisterRequest(string UserName, string Email, string Password);
 
 /// <summary>Payload required to authenticate.</summary>

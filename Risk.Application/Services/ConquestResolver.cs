@@ -12,8 +12,8 @@ public sealed record ConquestOutcome(bool PlayerEliminated);
 /// and taking over their cards, noting that the attacker has earned a card and checking for a winner.
 /// Attacks, blitz attacks and manually completed conquests all end here, so the rules exist once.
 /// <para>
-/// The card earned by conquering is not handed out here but when the attack phase is over
-/// (<see cref="AwardConquestCardAsync"/>), so it can never be traded in the turn it was earned.
+/// The card earned by conquering is not handed out here but when the turn ends (official rule,
+/// <see cref="AwardConquestCardAsync"/>), so it can never be traded in the turn it was earned.
 /// Cards taken over from an eliminated player are the exception: they change hands right away.
 /// </para>
 /// </summary>
@@ -68,8 +68,8 @@ public sealed class ConquestResolver(
 
     /// <summary>
     /// Hands out the card for conquering at least one territory this turn. Call it once per turn,
-    /// when the player's attack phase is over. Returns false when no card was earned or the draw
-    /// pile is empty.
+    /// when the turn ends but before it passes on to the next player. Returns false when no card was
+    /// earned or the draw pile is empty.
     /// </summary>
     public async Task<bool> AwardConquestCardAsync(
         Game game, Guid playerId, CancellationToken cancellationToken = default)
@@ -93,19 +93,22 @@ public sealed class ConquestResolver(
     private async Task EvaluateVictoryAsync(
         Game game, Guid playerId, CancellationToken cancellationToken)
     {
-        if (game.Settings?.HasMissions != true)
+        // Taking the whole board always wins, also with missions on and in the first round.
+        if (game.ControlsAllTerritories(playerId))
         {
-            if (game.ControlsAllTerritories(playerId))
-                game.FinishWithWinner(playerId);
+            game.FinishWithWinner(playerId);
             return;
         }
 
+        if (game.Settings?.HasMissions != true)
+            return;
+
         var mission = await missionCards.GetByPlayerIdAsync(game.Id, playerId, cancellationToken);
-        if (mission is null || mission.IsCompleted)
+        if (mission is null)
             return;
 
         var map = await mapRepository.GetGraphAsync(cancellationToken);
-        if (!mission.IsSatisfiedBy(game, map, playerId))
+        if (!mission.CanBeCompleted(game, map))
             return;
 
         mission.Complete(game, map);

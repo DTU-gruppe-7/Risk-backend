@@ -4,6 +4,7 @@ using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
+using Risk.Domain.Services;
 
 namespace Risk.Application.Cards;
 
@@ -11,25 +12,24 @@ namespace Risk.Application.Cards;
 public sealed class BonusCardService(
     IBonusCardRepository cards,
     IUnitOfWork unitOfWork,
-    GameAccess access,
-    FogOfWar fogOfWar)
+    GameAccess access)
 {
+    /// <summary>
+    /// The caller's own cards. Cards are secret, so nobody sees another player's hand or the draw pile,
+    /// with or without fog of war. A host who only watches has no cards.
+    /// </summary>
+    /// <param name="playerId">Optional; if given it must be the caller's own player.</param>
     public async Task<IReadOnlyList<BonusCardResponse>> GetAllAsync(Guid gameId, Guid? playerId, CancellationToken ct = default)
     {
         var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
-        if (fogOfWar.IsActive(game))
-            playerId = access.RequireCurrentPlayer(game).Id;
+        var me = access.FindCurrentPlayer(game);
+        if (playerId is { } requested && requested != me?.Id)
+            throw new ForbiddenException("You can only see your own cards.");
+        if (me is null)
+            return [];
 
-        var list = await cards.GetByGameIdAsync(gameId, playerId, ct);
+        var list = await cards.GetByGameIdAsync(gameId, me.Id, ct);
         return list.Select(BonusCardResponse.From).ToList();
-    }
-
-    public async Task<BonusCardResponse> AssignAsync(Guid gameId, Guid id, AssignCardRequest request, CancellationToken ct = default)
-    {
-        var game = await access.RequireParticipantAsync(gameId, ct);
-        EnsureInProgress(game);
-        GameAccess.RequirePlayerInGame(game, request.PlayerId);
-        return await ChangeAsync(gameId, id, card => card.AssignToPlayer(request.PlayerId), ct);
     }
 
     public async Task<TradeCardsResponse> TradeAsync(
@@ -37,31 +37,43 @@ public sealed class BonusCardService(
     {
         var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
         var player = access.RequireCurrentPlayer(game);
-        if (request.CardIds is null || request.CardIds.Count != 3 ||
-            request.CardIds.Distinct().Count() != 3)
+        if (request.CardIds is null || request.CardIds.Count != CardTradeRules.CardsPerTrade ||
+            request.CardIds.Distinct().Count() != CardTradeRules.CardsPerTrade)
             throw new DomainValidationException("Exactly three different cards must be traded.");
 
-        var hand = await cards.GetByPlayerIdAsync(gameId, player.Id, ct);
-        var selected = hand.Where(card => request.CardIds.Contains(card.Id)).ToList();
-        if (selected.Count != 3)
+        var selected = await CardsFromHandAsync(gameId, player.Id, request.CardIds, ct);
+        var result = game.TradeBonusCards(player.Id, selected);
+        await unitOfWork.SaveChangesAsync(ct);
+        return new TradeCardsResponse(result.ReserveTroops, result.BonusTerritoryId, result.BonusTroops);
+    }
+
+    /// <summary>
+    /// What trading the cards would give, without saving anything. Runs the same calculation as
+    /// <see cref="TradeAsync"/>, but any number of cards may be sent and the phase is not checked.
+    /// </summary>
+    public async Task<TradePreviewResponse> PreviewTradeAsync(
+        Guid gameId, TradeCardsRequest request, CancellationToken ct = default)
+    {
+        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        var player = access.RequireCurrentPlayer(game);
+        var selected = await CardsFromHandAsync(gameId, player.Id, request.CardIds ?? [], ct);
+        return TradePreviewResponse.From(game.PreviewCardTrade(player.Id, selected));
+    }
+
+    /// <summary>
+    /// The player's cards with the given ids, kept in request order: it decides which card's territory
+    /// gets the territory bonus. Refuses ids that are not in the player's hand.
+    /// </summary>
+    private async Task<List<BonusCard>> CardsFromHandAsync(
+        Guid gameId, Guid playerId, IReadOnlyList<Guid> cardIds, CancellationToken ct)
+    {
+        var hand = await cards.GetByPlayerIdAsync(gameId, playerId, ct);
+        var selected = cardIds
+            .Select(id => hand.FirstOrDefault(card => card.Id == id))
+            .OfType<BonusCard>()
+            .ToList();
+        if (selected.Count != cardIds.Count)
             throw new ForbiddenException("All selected cards must belong to your hand.");
-
-        var troops = game.TradeBonusCards(player.Id, selected);
-        await unitOfWork.SaveChangesAsync(ct);
-        return new TradeCardsResponse(troops);
-    }
-
-    private async Task<BonusCardResponse> ChangeAsync(Guid gameId, Guid id, Action<BonusCard> change, CancellationToken ct)
-    {
-        var card = await cards.GetAsync(gameId, id, ct) ?? throw new NotFoundException("Bonus card", id);
-        change(card);
-        await unitOfWork.SaveChangesAsync(ct);
-        return BonusCardResponse.From(card);
-    }
-
-    private static void EnsureInProgress(Game game)
-    {
-        if (game.State != GameState.InProgress)
-            throw new BusinessRuleException("Bonus cards can only be changed while the game is in progress.");
+        return selected;
     }
 }

@@ -5,6 +5,9 @@ using Risk.Application.Services;
 using Risk.Domain.Entities;
 using Risk.Domain.Exceptions;
 using Risk.Domain.Map;
+using Risk.Domain.Services;
+
+using Risk.Tests.Domain;
 
 namespace Risk.Tests.Application;
 
@@ -15,8 +18,12 @@ public class GameplayServiceTests
     {
         public int Calls { get; private set; }
 
+        /// <summary>How many dice each roll asked for, in order: attacker, defender, attacker, …</summary>
+        public List<int> Counts { get; } = [];
+
         public IReadOnlyList<int> Roll(int count)
         {
+            Counts.Add(count);
             var value = Calls++ % 2 == 0 ? attackerValue : defenderValue;
             return Enumerable.Repeat(value, count).ToList();
         }
@@ -48,7 +55,7 @@ public class GameplayServiceTests
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
         var green = threePlayers ? game.AddPlayer(Guid.NewGuid(), "green") : null;
-        game.Start(ClassicMap.Graph, new Random(1));
+        game.StartInJoinOrder(ClassicMap.Graph);
 
         var from = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, from, red.ReinforcementTroops);
@@ -110,8 +117,8 @@ public class GameplayServiceTests
     private static async Task<int> HandSizeAsync(Fixture f, Player player) =>
         (await f.BonusCards.GetByPlayerIdAsync(f.Game.Id, player.Id)).Count;
 
-    private static AttackDto Attack(Fixture f, int? moving, int attacking = 1, int defending = 1) =>
-        new(f.Game.Id, Guid.Empty, f.From.Id, f.To.Id, attacking, defending, moving);
+    private static AttackDto Attack(Fixture f, int? moving, int attacking = 1) =>
+        new(f.Game.Id, Guid.Empty, f.From.Id, f.To.Id, attacking, moving);
 
     // ---- AttackAsync ------------------------------------------------------
 
@@ -158,6 +165,59 @@ public class GameplayServiceTests
         Assert.Equal(0, f.Dice.Calls);
         Assert.Equal(toBefore, f.To.TroopCount);
         Assert.Equal(0, f.UnitOfWork.SaveCount);
+    }
+
+    [Theory]
+    [InlineData(5, 2)]
+    [InlineData(2, 2)]
+    [InlineData(1, 1)]
+    public async Task The_server_rolls_as_many_defending_dice_as_the_defender_may(int defendingTroops, int expectedDice)
+    {
+        var f = Create(toTroops: defendingTroops);
+
+        var result = await f.Service.AttackAsync(Attack(f, moving: null, attacking: 3));
+
+        Assert.Equal(expectedDice, f.Dice.Counts[1]);
+        Assert.Equal(expectedDice, result.DefenderDice.Count);
+    }
+
+    [Fact]
+    public async Task The_attack_result_lists_each_pair_of_dice_and_its_winner()
+    {
+        var f = Create(toTroops: 5);
+
+        var result = await f.Service.AttackAsync(Attack(f, moving: null, attacking: 3));
+
+        Assert.Equal(
+            [new DiceComparisonDto(6, 1, BattleSide.Attacker), new DiceComparisonDto(6, 1, BattleSide.Attacker)],
+            result.Comparisons);
+        Assert.Equal(2, result.DefenderLosses);
+    }
+
+    [Fact]
+    public async Task Every_blitz_round_has_losses_that_match_its_comparisons()
+    {
+        var f = Create(fromTroops: 6, toTroops: 5);
+
+        var result = await f.Service.BlitzAttackAsync(new BlitzAttackDto(f.Game.Id, Guid.Empty, f.From.Id, f.To.Id));
+
+        Assert.NotEmpty(result.Rounds);
+        Assert.All(result.Rounds, round =>
+        {
+            Assert.Equal(round.Comparisons.Count(c => c.Winner == BattleSide.Defender), round.AttackerLosses);
+            Assert.Equal(round.Comparisons.Count(c => c.Winner == BattleSide.Attacker), round.DefenderLosses);
+        });
+    }
+
+    [Fact]
+    public async Task Blitz_rolls_the_same_dice_as_a_single_attack_would()
+    {
+        var f = Create(fromTroops: 3, toTroops: 5);
+
+        await f.Service.BlitzAttackAsync(new BlitzAttackDto(f.Game.Id, Guid.Empty, f.From.Id, f.To.Id));
+
+        // First round: 3 troops attack with 2 dice, 5 troops defend with 2.
+        Assert.Equal([2, 2], f.Dice.Counts.Take(2));
     }
 
     [Fact]
@@ -235,7 +295,7 @@ public class GameplayServiceTests
     // ---- The card earned by conquering -----------------------------------
 
     [Fact]
-    public async Task The_conquest_card_is_handed_out_when_the_attack_phase_ends_and_not_before()
+    public async Task The_attack_itself_hands_out_no_conquest_card_only_the_award_does()
     {
         var f = Create();
         f.BonusCards.Add(new BonusCard(f.Game.Id, BonusCardType.Infantry));
@@ -348,10 +408,10 @@ public class GameplayServiceTests
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             guard.EnsureCompletedAsync(f.Game, f.Red.Id));
 
-        var troops = f.Game.TradeBonusCards(f.Red.Id, [.. redCards, blueCards[0]]);
+        var trade = f.Game.TradeBonusCards(f.Red.Id, [.. redCards, blueCards[0]]);
         await guard.EnsureCompletedAsync(f.Game, f.Red.Id);
         Assert.Equal(2, await HandSizeAsync(f, f.Red));
-        Assert.True(troops > 0);
+        Assert.True(trade.ReserveTroops > 0);
 
         // The new troops go wherever the player wants, and then the attack phase opens again.
         var anywhere = f.Game.Territories.First(t => t.OwnerId == f.Red.Id && t.Id != f.From.Id);

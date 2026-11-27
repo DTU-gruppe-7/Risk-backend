@@ -52,6 +52,12 @@ public sealed class Player
         TurnOrder = Guard.Positive(turnOrder, nameof(turnOrder));
     }
 
+    /// <summary>Sets the player's seat in the turn order, decided when the game starts.</summary>
+    internal void AssignTurnOrder(int turnOrder)
+    {
+        TurnOrder = Guard.Positive(turnOrder, nameof(turnOrder));
+    }
+
     internal void AddReinforcements(int troops)
     {
         ReinforcementTroops += Guard.Positive(troops, nameof(troops));

@@ -17,7 +17,7 @@ public class GameTests
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
 
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Equal(Map.TerritoryIds, game.Territories.Select(t => t.Identifier));
         Assert.All(game.Territories.Where(t => !t.IsBlizzard), t =>
@@ -39,6 +39,85 @@ public class GameTests
         Assert.Equal(0, blue.ReinforcementTroops);
     }
 
+    // ---- Turn order and first-round bonus ------------------------------------
+
+    private static Game SixPlayerGame()
+    {
+        var game = new Game(Host);
+        game.AddPlayer(Host, "red");
+        foreach (var color in new[] { "blue", "green", "yellow", "purple", "black" })
+            game.AddPlayer(Guid.NewGuid(), color);
+        return game;
+    }
+
+    /// <summary>Normal reinforcements: territories / 3 (at least 3) plus continent bonus.</summary>
+    private static int NormalReinforcements(Game game, Player player) =>
+        Math.Max(3, game.Territories.Count(t => t.OwnerId == player.Id) / 3) +
+        game.BoardOn(Map).ContinentBonusFor(player.Id);
+
+    [Fact]
+    public void Start_seats_every_player_once_in_a_random_turn_order()
+    {
+        var firstPlayers = new HashSet<Guid>();
+        for (var seed = 0; seed < 20; seed++)
+        {
+            var game = SixPlayerGame();
+
+            game.Start(Map, new Random(seed));
+
+            Assert.Equal([1, 2, 3, 4, 5, 6], game.Players.Select(p => p.TurnOrder).Order());
+            var first = game.Players.Single(p => p.TurnOrder == 1);
+            Assert.Equal(first.Id, game.CurrentPlayerId);
+            firstPlayers.Add(first.UserId);
+        }
+
+        // Neither the host nor any other seat is guaranteed the first turn.
+        Assert.True(firstPlayers.Count > 1);
+    }
+
+    [Fact]
+    public void The_turn_order_stays_the_same_for_the_rest_of_the_game()
+    {
+        var game = SixPlayerGame();
+        game.Start(Map, new Random(7));
+        var seats = game.Players.ToDictionary(p => p.Id, p => p.TurnOrder);
+        var expectedTurns = game.Players.OrderBy(p => p.TurnOrder).Select(p => p.Id).ToList();
+
+        var turns = new List<Guid>();
+        for (var turn = 0; turn < 2 * expectedTurns.Count; turn++)
+        {
+            var current = game.Players.Single(p => p.Id == game.CurrentPlayerId);
+            turns.Add(current.Id);
+            game.PlayTurn(current);
+        }
+
+        Assert.Equal(expectedTurns.Concat(expectedTurns), turns);
+        Assert.All(game.Players, p => Assert.Equal(seats[p.Id], p.TurnOrder));
+    }
+
+    [Fact]
+    public void Seats_four_to_six_get_bonus_troops_in_the_first_round_only()
+    {
+        var game = SixPlayerGame();
+        game.StartInJoinOrder(Map);
+        var seated = game.Players.OrderBy(p => p.TurnOrder).ToList();
+        int[] firstRoundBonus = [0, 0, 0, 1, 2, 3];
+
+        foreach (var (player, bonus) in seated.Zip(firstRoundBonus))
+        {
+            Assert.Equal(1, game.Round);
+            Assert.Equal(NormalReinforcements(game, player) + bonus, player.ReinforcementTroops);
+            game.PlayTurn(player);
+        }
+
+        foreach (var player in seated)
+        {
+            Assert.Equal(2, game.Round);
+            Assert.Equal(NormalReinforcements(game, player), player.ReinforcementTroops);
+            game.PlayTurn(player);
+        }
+    }
+
     [Fact]
     public void Start_does_not_assign_blizzard_territories()
     {
@@ -47,7 +126,7 @@ public class GameTests
         game.AddPlayer(Guid.NewGuid(), "blue");
         game.ConfigureSettings(2, 0, 0, false, false, blizzardCount: 2);
 
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.All(game.Territories.Where(t => t.IsBlizzard), t =>
         {
@@ -62,7 +141,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
         var reserveBefore = red.ReinforcementTroops;
         var troopsBefore = territory.TroopCount;
@@ -79,7 +158,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
 
         game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
@@ -94,7 +173,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
 
@@ -107,7 +186,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var territory = game.Territories.First(t => t.OwnerId == blue.Id);
 
         Assert.Throws<BusinessRuleException>(() => game.DeployTroops(blue.Id, territory, 1));
@@ -119,7 +198,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         game.DeployTroops(red.Id, game.Territories.First(t => t.OwnerId == red.Id), red.ReinforcementTroops);
         game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
@@ -150,7 +229,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         game.DeployTroops(red.Id, game.Territories.First(t => t.OwnerId == red.Id), red.ReinforcementTroops);
         game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow);
@@ -168,7 +247,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var now = DateTimeOffset.UtcNow;
         var territory = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, territory, red.ReinforcementTroops);
@@ -184,12 +263,35 @@ public class GameTests
     }
 
     [Fact]
+    public void Round_advances_when_every_player_has_had_a_turn_and_only_then_allows_mission_victory()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        Assert.Equal(0, game.Round);
+
+        game.StartInJoinOrder(Map);
+        Assert.Equal(1, game.Round);
+        Assert.False(game.IsMissionVictoryAllowed);
+
+        game.PlayTurn(red);
+        Assert.Equal(blue.Id, game.CurrentPlayerId);
+        Assert.Equal(1, game.Round);
+        Assert.False(game.IsMissionVictoryAllowed);
+
+        game.PlayTurn(blue);
+        Assert.Equal(red.Id, game.CurrentPlayerId);
+        Assert.Equal(2, game.Round);
+        Assert.True(game.IsMissionVictoryAllowed);
+    }
+
+    [Fact]
     public void Starting_a_new_turn_adds_territory_based_reinforcements()
     {
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         var redTerritory = game.Territories.First(t => t.OwnerId == red.Id);
         game.DeployTroops(red.Id, redTerritory, red.ReinforcementTroops);
@@ -207,7 +309,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Throws<BusinessRuleException>(() =>
             game.EndPhase(red.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow));
@@ -220,13 +322,37 @@ public class GameTests
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
         game.ConfigureSettings(6, 0, 10, false, false);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var turnStarted = game.TurnStartedAt!.Value;
 
-        Assert.True(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10)));
+        Assert.True(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10), new Random(1)));
         Assert.Equal(GamePhase.Deployment, game.CurrentPhase);
         Assert.NotEqual(red.Id, game.CurrentPlayerId);
-        Assert.False(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10)));
+        Assert.False(game.AdvanceIfTurnTimedOut(Map, turnStarted.AddSeconds(10), new Random(1)));
+    }
+
+    [Fact]
+    public void A_timed_out_turn_places_undeployed_troops_on_the_players_territories()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.ConfigureSettings(6, 0, 10, false, false);
+        game.StartInJoinOrder(Map);
+        var reserve = red.ReinforcementTroops;
+        var troopsOnBoard = game.Territories.Where(t => t.OwnerId == red.Id).Sum(t => t.TroopCount);
+        Assert.True(reserve > 0);
+
+        game.AdvanceIfTurnTimedOut(Map, game.TurnStartedAt!.Value.AddSeconds(10), new Random(1));
+
+        Assert.Equal(0, red.ReinforcementTroops);
+        Assert.Equal(troopsOnBoard + reserve, game.Territories.Where(t => t.OwnerId == red.Id).Sum(t => t.TroopCount));
+
+        // Next turn red gets only the normal reinforcements, nothing saved up from the timed-out turn.
+        game.PlayTurn(blue);
+        var expected = Math.Max(3, game.Territories.Count(t => t.OwnerId == red.Id) / 3)
+                       + game.BoardOn(Map).ContinentBonusFor(red.Id);
+        Assert.Equal(expected, red.ReinforcementTroops);
     }
 
     [Fact]
@@ -235,7 +361,7 @@ public class GameTests
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         var blue = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Throws<BusinessRuleException>(() => game.EndPhase(blue.Id, GamePhase.Attack, Map, DateTimeOffset.UtcNow));
         Assert.Throws<BusinessRuleException>(() => game.EndPhase(red.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow));
@@ -249,7 +375,7 @@ public class GameTests
         game.AddPlayer(Guid.NewGuid(), "blue");
         game.ConfigureSettings(6, 0, 0, false, false, blizzardCount: 5);
 
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Equal(5, game.Territories.Count(t => t.IsBlizzard));
     }
@@ -353,7 +479,7 @@ public class GameTests
         var game = new Game(Host);
         var player = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Throws<BusinessRuleException>(() => game.AddPlayer(Guid.NewGuid(), "blue"));
         Assert.Throws<BusinessRuleException>(() => game.RemovePlayer(player.Id));
@@ -389,7 +515,7 @@ public class GameTests
         game.AddPlayer(Guid.NewGuid(), "blue");
 
         Assert.Throws<BusinessRuleException>(game.End);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         Assert.Throws<BusinessRuleException>(() => game.Start(Map, new Random(1)));
         game.End();
 
@@ -408,7 +534,7 @@ public class GameTests
         Assert.Throws<BusinessRuleException>(() =>
             game.EndPhase(player.Id, GamePhase.Fortify, Map, DateTimeOffset.UtcNow));
 
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var territory = game.Territories.First(t => t.OwnerId == player.Id);
         game.DeployTroops(player.Id, territory, player.ReinforcementTroops);
 
@@ -422,7 +548,7 @@ public class GameTests
         var game = new Game(Host);
         var player = game.AddPlayer(Guid.NewGuid(), "red");
         var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         foreach (var territory in game.Territories.Where(t => t.OwnerId == player.Id).ToList())
             territory.TransferOwnership(opponent.Id, 1);
@@ -439,7 +565,7 @@ public class GameTests
         var game = new Game(Host);
         var winner = game.AddPlayer(Guid.NewGuid(), "red");
         var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         foreach (var territory in game.Territories.Where(t => t.OwnerId == opponent.Id).ToList())
             territory.TransferOwnership(winner.Id, 1);
@@ -460,7 +586,7 @@ public class GameTests
 
         var player = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         Assert.Equal(before + 3, game.Version);
     }
@@ -478,19 +604,44 @@ public class GameTests
     }
 
     [Fact]
+    public void FindPlayerByUser_finds_players_but_not_a_host_who_only_watches()
+    {
+        var game = new Game(Host);
+        var user = Guid.NewGuid();
+        var red = game.AddPlayer(user, "red");
+
+        Assert.Same(red, game.FindPlayerByUser(user));
+        Assert.Null(game.FindPlayerByUser(Host));
+    }
+
+    [Fact]
+    public void EnsureCurrentTurn_only_accepts_the_player_whose_turn_it_is()
+    {
+        var game = new Game(Host);
+        var red = game.AddPlayer(Guid.NewGuid(), "red");
+        var blue = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.StartInJoinOrder(Map);
+
+        game.EnsureCurrentTurn(red.Id);
+        var error = Assert.Throws<BusinessRuleException>(() => game.EnsureCurrentTurn(blue.Id));
+        Assert.Equal("It is not this player's turn.", error.Message);
+    }
+
+    [Fact]
     public void Battle_losses_reduce_troops_and_bump_the_version_even_without_a_conquest()
     {
         var game = new Game(Host);
         var red = game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var from = game.Territories.First(t => t.OwnerId == red.Id);
         var to = game.Territories.First(t => t.OwnerId != red.Id && !t.IsBlizzard);
         from.AddTroops(5);
         to.AddTroops(5);
         var (fromTroops, toTroops, version) = (from.TroopCount, to.TroopCount, game.Version);
 
-        game.ApplyBattleLosses(from, to, new BattleResult(1, 1, [6, 1], [6, 1]));
+        // 6 beats 5, 2 beats 1: each side loses one troop.
+        game.ApplyBattleLosses(from, to, BattleService.Fight([6, 1], [5, 2]));
 
         Assert.Equal(fromTroops - 1, from.TroopCount);
         Assert.Equal(toTroops - 1, to.TroopCount);
@@ -503,13 +654,13 @@ public class GameTests
         var game = new Game(Host);
         game.AddPlayer(Guid.NewGuid(), "red");
         game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
         var other = new Game(Host);
         other.AddPlayer(Guid.NewGuid(), "red");
         other.AddPlayer(Guid.NewGuid(), "blue");
-        other.Start(Map, new Random(1));
+        other.StartInJoinOrder(Map);
 
         Assert.Throws<BusinessRuleException>(() => game.ApplyBattleLosses(
-            game.Territories.First(), other.Territories.First(), new BattleResult(1, 0, [1], [6])));
+            game.Territories.First(), other.Territories.First(), BattleService.Fight([1], [6])));
     }
 }

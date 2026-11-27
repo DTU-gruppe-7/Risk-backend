@@ -16,21 +16,20 @@ public sealed class PlayerService(
     IMissionCardRepository missionCards,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
-    GameAccess access,
-    FogOfWar fogOfWar)
+    GameAccess access)
 {
     public async Task<IReadOnlyList<PlayerDetailResponse>> GetAllAsync(Guid gameId, CancellationToken ct = default)
     {
-        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        await access.RequireParticipantAsync(gameId, ct);
         var list = await players.GetPlayersByGameIdAsync(gameId, ct);
-        return list.Select(player => ToResponse(game, player)).ToList();
+        return list.Select(PlayerDetailResponse.From).ToList();
     }
 
     public async Task<PlayerDetailResponse> GetByIdAsync(Guid gameId, Guid id, CancellationToken ct = default)
     {
-        var game = await access.RequireParticipantWithDetailsAsync(gameId, ct);
+        await access.RequireParticipantAsync(gameId, ct);
         var player = await players.GetAsync(gameId, id, ct) ?? throw new NotFoundException("Player", id);
-        return ToResponse(game, player);
+        return PlayerDetailResponse.From(player);
     }
 
     /// <summary>Joins the game as the current user.</summary>
@@ -77,9 +76,4 @@ public sealed class PlayerService(
 
     private static Player RequirePlayer(Game game, Guid id) =>
         game.FindPlayer(id) ?? throw new NotFoundException("Player", id);
-
-    private PlayerDetailResponse ToResponse(Game game, Player player) =>
-        fogOfWar.IsActive(game)
-            ? PlayerDetailResponse.From(player, fogOfWar.ViewerPlayerId(game))
-            : PlayerDetailResponse.From(player);
 }

@@ -1,0 +1,77 @@
+name: Oppetid
+
+# Tjekker dev og prod udefra hvert 10. minut. Kører på GitHubs servere, så det opdager også,
+# hvis hele VM'en er nede. Det kan monitoring på VM'en ikke selv.
+on:
+  schedule:
+    - cron: "7-59/10 * * * *"   # ikke på hele 10-minutter, hvor GitHub har mest travlt
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Tjek ${{ matrix.env }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [prod, dev]
+    env:
+      ENV_NAME: ${{ matrix.env }}
+      URL: ${{ matrix.env == 'prod' && vars.PROD_URL || vars.DEV_URL }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Kald /api/map
+        id: check
+        run: |
+          # Tre forsøg med pause, så et enkelt netværksblip ikke giver alarm.
+          # /api/map rammer både API'et og databasen.
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL/api/map" || true)
+            if [ "$code" = "200" ]; then echo "status=up" >> "$GITHUB_OUTPUT"; exit 0; fi
+            sleep 20
+          done
+          echo "status=down" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Opret eller luk issue, og send mail
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ steps.check.outputs.status }}
+          CODE: ${{ steps.check.outputs.code }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_FROM: ${{ vars.ALERT_FROM }}
+          ALERT_EMAILS: ${{ vars.ALERT_EMAILS }}
+        run: |
+          title="Nedetid: $ENV_NAME"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          send_mail() {
+            [ -n "$RESEND_API_KEY" ] || return 0
+            jq -n --arg from "$ALERT_FROM" --arg to "$ALERT_EMAILS" --arg subject "$1" --arg text "$2" \
+              '{from: $from, to: ($to | split(";")), subject: $subject, text: $text}' |
+              curl -fsS https://api.resend.com/emails \
+                -H "Authorization: Bearer $RESEND_API_KEY" -H 'Content-Type: application/json' \
+                --data-binary @- > /dev/null
+          }
+
+          gh label create nedetid --color B60205 --description "Oppetidstjekket kunne ikke nå siden" --force > /dev/null
+          open=$(gh issue list --state open --label nedetid --json number,title \
+            --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+
+          if [ "$STATUS" = "down" ] && [ -z "$open" ]; then
+            body="$URL/api/map svarede ikke med 200 efter tre forsøg (sidste svar: ${CODE:-ingen forbindelse}). Kørsel: $run_url"
+            gh issue create --title "$title" --label nedetid --body "$body"
+            send_mail "Risk $ENV_NAME er nede" "$body"
+          elif [ "$STATUS" = "up" ] && [ -n "$open" ]; then
+            gh issue close "$open" --comment "Oppe igen. Kørsel: $run_url"
+            send_mail "Risk $ENV_NAME er oppe igen" "$URL svarer igen. Kørsel: $run_url"
+          fi

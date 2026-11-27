@@ -99,7 +99,7 @@ public class CardTests
         var game = new Game(Guid.NewGuid());
         var player = game.AddPlayer(Guid.NewGuid(), "red");
         var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
-        game.Start(ClassicMap.Graph, new Random(1));
+        game.StartInJoinOrder(ClassicMap.Graph);
         var mission = new MissionCard(
             game.Id, "Conquer the world", "Hold every territory.",
             MissionObjectiveType.ControlAllTerritories);
@@ -108,6 +108,8 @@ public class CardTests
             mission.Complete(game, ClassicMap.Graph));
 
         mission.AssignToPlayer(player.Id);
+        game.PlayTurn(player);
+        game.PlayTurn(opponent);
         foreach (var territory in game.Territories.Where(t => t.OwnerId == opponent.Id).ToList())
             territory.TransferOwnership(player.Id, 1);
 
@@ -115,5 +117,24 @@ public class CardTests
         Assert.True(mission.IsCompleted);
         Assert.Throws<BusinessRuleException>(() =>
             mission.Complete(game, ClassicMap.Graph));
+    }
+
+    [Fact]
+    public void Mission_cannot_be_completed_in_the_first_round_even_when_its_objective_is_met()
+    {
+        var game = new Game(Guid.NewGuid());
+        var player = game.AddPlayer(Guid.NewGuid(), "red");
+        var opponent = game.AddPlayer(Guid.NewGuid(), "blue");
+        game.StartInJoinOrder(ClassicMap.Graph);
+        var mission = new MissionCard(
+            game.Id, "Conquer the world", "Hold every territory.",
+            MissionObjectiveType.ControlAllTerritories);
+        mission.AssignToPlayer(player.Id);
+        foreach (var territory in game.Territories.Where(t => t.OwnerId == opponent.Id).ToList())
+            territory.TransferOwnership(player.Id, 1);
+
+        Assert.False(mission.CanBeCompleted(game, ClassicMap.Graph));
+        Assert.Throws<BusinessRuleException>(() => mission.Complete(game, ClassicMap.Graph));
+        Assert.False(mission.IsCompleted);
     }
 }

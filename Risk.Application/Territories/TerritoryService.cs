@@ -44,7 +44,7 @@ public sealed class TerritoryService(
         var territory = game.Territories.FirstOrDefault(t => t.Id == id)
                         ?? throw new NotFoundException("Territory", id);
 
-        var player = game.Players.FirstOrDefault(p => p.UserId == currentUser.UserId)
+        var player = game.FindPlayerByUser(currentUser.UserId)
                      ?? throw new ForbiddenException("Only a player can deploy troops.");
         await forcedCardTrade.EnsureCompletedAsync(game, player.Id, ct);
         game.DeployTroops(player.Id, territory, request.Troops);

@@ -10,11 +10,13 @@ public record BlitzAttackDto(
 
 public record CompleteConquestDto(Guid GameId, Guid FromTerritoryId, Guid ToTerritoryId, int MovingTroopsCount);
 
+/// <param name="Comparisons">Each pair of dice compared in this round, highest first, and who won it.</param>
 public record BlitzRoundDto(
     IReadOnlyList<int> AttackerDice,
     IReadOnlyList<int> DefenderDice,
     int AttackerLosses,
-    int DefenderLosses
+    int DefenderLosses,
+    IReadOnlyList<DiceComparisonDto> Comparisons
 );
 
 public record BlitzResultDto(

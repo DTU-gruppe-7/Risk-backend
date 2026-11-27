@@ -150,7 +150,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Exchanges the refresh cookie for a new access token. The refresh token is rotated:\r\nthe old one stops working and a new cookie is set.",
+        "summary": "Exchanges the refresh cookie for a new access token. The refresh token is rotated:\nthe old one stops working and a new cookie is set.",
         "responses": {
           "200": {
             "description": "A new access token.",
@@ -213,7 +213,7 @@
         "tags": [
           "BonusCards"
         ],
-        "summary": "Lists bonus cards in a game, optionally filtered by player.",
+        "summary": "The caller's own cards. Other players' hands and the draw pile are secret.",
         "parameters": [
           {
             "name": "gameId",
@@ -228,7 +228,7 @@
           {
             "name": "playerId",
             "in": "query",
-            "description": "Optional: only return cards held by this player.",
+            "description": "Optional; if given it must be the caller's own player id.",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -237,7 +237,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Card list returned.",
+            "description": "The caller's cards (none for a host who only watches).",
             "content": {
               "text/plain": {
                 "schema": {
@@ -261,162 +261,32 @@
                   "items": {
                     "$ref": "#/components/schemas/BonusCardResponse"
                   }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Another player's cards were asked for.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
           },
           "404": {
             "description": "Game not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/games/{gameId}/bonus-cards/{id}/assign": {
-      "put": {
-        "tags": [
-          "BonusCards"
-        ],
-        "summary": "Assigns a bonus card from the draw pile to a player.",
-        "parameters": [
-          {
-            "name": "gameId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignCardRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignCardRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignCardRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Card assigned.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BonusCardResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The player is not part of this game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Card not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Card already used.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -538,6 +408,107 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{gameId}/bonus-cards/trade-in/preview": {
+      "post": {
+        "tags": [
+          "BonusCards"
+        ],
+        "summary": "Shows what trading the cards would give, without trading them. Works in any phase and for any\nnumber of cards: anything but a valid set of three gives `isValid: false`.",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeCardsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Preview returned.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A card is not in the caller's hand.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1759,7 +1730,7 @@
         "tags": [
           "MissionCards"
         ],
-        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\r\nso other players' cards are never returned.",
+        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\nso other players' cards are never returned.",
         "parameters": [
           {
             "name": "gameId",
@@ -1823,156 +1794,6 @@
           },
           "404": {
             "description": "Game not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/games/{gameId}/mission-cards/{id}/assign": {
-      "put": {
-        "tags": [
-          "MissionCards"
-        ],
-        "summary": "Assigns a mission card to a player.",
-        "parameters": [
-          {
-            "name": "gameId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignMissionRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignMissionRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignMissionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Mission assigned.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/MissionCardResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MissionCardResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MissionCardResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The player is not part of this game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Caller is not part of the game.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Mission card not found.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Mission already assigned.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2574,12 +2395,42 @@
         }
       }
     },
+    "/api/rules/card-trades": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "The card trade rules: set values in both trade modes, the territory bonus and the forced trade.",
+        "responses": {
+          "200": {
+            "description": "Rules returned. They never change at runtime, so clients may cache them.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardTradeRulesResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardTradeRulesResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardTradeRulesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/games/{gameId}/territories": {
       "get": {
         "tags": [
           "Territories"
         ],
-        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\r\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
+        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
         "parameters": [
           {
             "name": "gameId",
@@ -3015,30 +2866,6 @@
   },
   "components": {
     "schemas": {
-      "AssignCardRequest": {
-        "required": [
-          "playerId"
-        ],
-        "type": "object",
-        "properties": {
-          "playerId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "AssignMissionRequest": {
-        "required": [
-          "playerId"
-        ],
-        "type": "object",
-        "properties": {
-          "playerId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
       "AttackRequest": {
         "required": [
           "fromTerritoryId",
@@ -3049,10 +2876,12 @@
         "properties": {
           "fromTerritoryId": {
             "type": "string",
+            "description": "The attacking territory (territory state id).",
             "format": "uuid"
           },
           "toTerritoryId": {
             "type": "string",
+            "description": "The defending territory (territory state id).",
             "format": "uuid"
           },
           "attackingTroopsCount": {
@@ -3061,16 +2890,18 @@
               "integer",
               "string"
             ],
+            "description": "How many dice the attacker rolls: 1–3, leaving one troop behind.",
             "format": "int32"
           },
           "defendingTroopsCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
-            "format": "int32",
-            "default": 2
+            "description": "Ignored: the server always rolls as many dice as the defender may. Will be removed.",
+            "format": "int32"
           },
           "movingTroopsCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -3079,6 +2910,7 @@
               "integer",
               "string"
             ],
+            "description": "Troops to move in if the territory is conquered; null leaves the conquest pending.",
             "format": "int32"
           }
         }
@@ -3089,6 +2921,7 @@
           "defenderLosses",
           "attackerDice",
           "defenderDice",
+          "comparisons",
           "territoryConquered"
         ],
         "type": "object",
@@ -3129,6 +2962,12 @@
                 "string"
               ],
               "format": "int32"
+            }
+          },
+          "comparisons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiceComparisonDto"
             }
           },
           "territoryConquered": {
@@ -3179,6 +3018,9 @@
             "type": "string"
           }
         }
+      },
+      "BattleSide": {
+        "type": "integer"
       },
       "BlitzRequest": {
         "required": [
@@ -3274,7 +3116,8 @@
           "attackerDice",
           "defenderDice",
           "attackerLosses",
-          "defenderLosses"
+          "defenderLosses",
+          "comparisons"
         ],
         "type": "object",
         "properties": {
@@ -3315,6 +3158,12 @@
               "string"
             ],
             "format": "int32"
+          },
+          "comparisons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiceComparisonDto"
+            }
           }
         }
       },
@@ -3360,6 +3209,85 @@
       },
       "BonusCardType": {
         "type": "integer"
+      },
+      "CardTradeMode": {
+        "type": "integer"
+      },
+      "CardTradeRulesResponse": {
+        "required": [
+          "fixedSets",
+          "firstProgressiveValues",
+          "ownedTerritoryBonus",
+          "cardsPerTrade",
+          "forcedTradeHandSize"
+        ],
+        "type": "object",
+        "properties": {
+          "fixedSets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CardTradeSetResponse"
+            }
+          },
+          "firstProgressiveValues": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "ownedTerritoryBonus": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cardsPerTrade": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "forcedTradeHandSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CardTradeSetResponse": {
+        "required": [
+          "types",
+          "troops"
+        ],
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BonusCardType"
+            }
+          },
+          "troops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
       },
       "ConquestRequest": {
         "required": [
@@ -3460,6 +3388,16 @@
               "null",
               "string"
             ]
+          },
+          "cardTradeMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardTradeMode"
+              }
+            ]
           }
         }
       },
@@ -3476,6 +3414,35 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "DiceComparisonDto": {
+        "required": [
+          "attackerDie",
+          "defenderDie",
+          "winner"
+        ],
+        "type": "object",
+        "properties": {
+          "attackerDie": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "defenderDie": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "winner": {
+            "$ref": "#/components/schemas/BattleSide"
           }
         }
       },
@@ -3519,7 +3486,11 @@
           "createdAt",
           "startedAt",
           "endedAt",
-          "turnStartedAt"
+          "turnStartedAt",
+          "round",
+          "pendingConquest",
+          "cardSetsTraded",
+          "upcomingTradeValues"
         ],
         "type": "object",
         "properties": {
@@ -3599,6 +3570,43 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "round": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pendingConquest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PendingConquestResponse"
+              }
+            ]
+          },
+          "cardSetsTraded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "upcomingTradeValues": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
           }
         }
       },
@@ -3615,7 +3623,8 @@
           "hasFogOfWar",
           "hasMissions",
           "victoryMode",
-          "blizzardCount"
+          "blizzardCount",
+          "cardTradeMode"
         ],
         "type": "object",
         "properties": {
@@ -3667,6 +3676,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "cardTradeMode": {
+            "$ref": "#/components/schemas/CardTradeMode"
           }
         }
       },
@@ -3926,6 +3938,41 @@
       "MissionObjectiveType": {
         "type": "integer"
       },
+      "PendingConquestResponse": {
+        "required": [
+          "fromTerritoryId",
+          "toTerritoryId",
+          "minTroops",
+          "maxTroops"
+        ],
+        "type": "object",
+        "properties": {
+          "fromTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toTerritoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "PingResponse": {
         "required": [
           "status",
@@ -4003,7 +4050,8 @@
           "color",
           "turnOrder",
           "reinforcementTroops",
-          "isEliminated"
+          "isEliminated",
+          "mustTradeCards"
         ],
         "type": "object",
         "properties": {
@@ -4038,6 +4086,9 @@
             "format": "int32"
           },
           "isEliminated": {
+            "type": "boolean"
+          },
+          "mustTradeCards": {
             "type": "boolean"
           }
         }
@@ -4175,6 +4226,60 @@
               "string"
             ],
             "format": "int32"
+          },
+          "bonusTerritoryId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "bonusTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          }
+        }
+      },
+      "TradePreviewResponse": {
+        "required": [
+          "isValid",
+          "troops",
+          "bonusTerritoryId",
+          "bonusTroops"
+        ],
+        "type": "object",
+        "properties": {
+          "isValid": {
+            "type": "boolean"
+          },
+          "troops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "bonusTerritoryId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "bonusTroops": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -4234,6 +4339,16 @@
               },
               {
                 "$ref": "#/components/schemas/GameVictoryMode"
+              }
+            ]
+          },
+          "cardTradeMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardTradeMode"
               }
             ]
           }
@@ -4348,6 +4463,9 @@
     },
     {
       "name": "Players"
+    },
+    {
+      "name": "Rules"
     },
     {
       "name": "Territories"

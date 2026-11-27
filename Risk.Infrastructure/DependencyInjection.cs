@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Identity;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Application.Interfaces.Services;
@@ -29,11 +30,23 @@ public static class DependencyInjection
         services.AddIdentityCore<ApplicationUser>(options =>
             {
                 options.User.RequireUniqueEmail = true;
-                options.Password.RequiredLength = 12;
+                // NIST SP 800-63B: mindst 15 tegn ved én faktor og ingen kompositionsregler.
+                options.Password.RequiredLength = 15;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.Lockout.AllowedForNewUsers = true;
             })
             .AddRoles<ApplicationRole>()
+            .AddPasswordValidator<CommonPasswordValidator>()
             .AddEntityFrameworkStores<AppDbContext>();
+        // OWASP: mindst 210.000 iterationer for PBKDF2-HMAC-SHA512, som Identity bruger. Standarden er 100.000.
+        services.Configure<PasswordHasherOptions>(options => options.IterationCount = 210_000);
         services.AddScoped<IIdentityService, IdentityService>();
+        services.AddSingleton<AuthMetrics>();
 
         // DataProtection-nøgler i databasen, så de overlever deploys og virker med read-only containere
         services.AddDataProtection()

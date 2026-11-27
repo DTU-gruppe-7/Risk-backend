@@ -69,11 +69,20 @@ public sealed class MissionCard
             throw new BusinessRuleException("Cannot complete an unassigned mission.");
         if (IsCompleted)
             throw new BusinessRuleException("Mission is already completed.");
+        if (!game.IsMissionVictoryAllowed)
+            throw new BusinessRuleException("A mission cannot be completed before every player has had a turn.");
         if (!IsSatisfiedBy(game, map, PlayerId.Value))
             throw new BusinessRuleException("The mission objective has not been completed.");
 
         IsCompleted = true;
     }
+
+    /// <summary>Whether <see cref="Complete"/> would succeed now, for callers that should not throw.</summary>
+    public bool CanBeCompleted(Game game, MapGraph map) =>
+        PlayerId.HasValue &&
+        !IsCompleted &&
+        game.IsMissionVictoryAllowed &&
+        IsSatisfiedBy(game, map, PlayerId.Value);
 
     public bool IsSatisfiedBy(Game game, MapGraph map, Guid playerId) =>
         ObjectiveType switch

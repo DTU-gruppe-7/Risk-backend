@@ -17,7 +17,7 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
 
     /// <summary>The current user's player in this game, or null for a host who is not playing.</summary>
     public Guid? ViewerPlayerId(Game game) =>
-        game.Players.FirstOrDefault(player => player.UserId == currentUser.UserId)?.Id;
+        game.FindPlayerByUser(currentUser.UserId)?.Id;
 
     /// <summary>The territories the current user can see, or null when the game has no fog of war.</summary>
     public async Task<IReadOnlySet<string>?> VisibleTerritoriesAsync(
@@ -33,6 +33,21 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
     }
 
     /// <summary>
+    /// The territories the current user can see, or null when the game has no fog of war. Unlike
+    /// <see cref="VisibleTerritoriesAsync"/> a host who only watches is not refused: they see none.
+    /// For filtering responses that every participant may fetch.
+    /// </summary>
+    public async Task<IReadOnlySet<string>?> VisibleToCurrentUserAsync(
+        Game game, CancellationToken cancellationToken = default)
+    {
+        if (!IsActive(game))
+            return null;
+
+        var graph = await mapRepository.GetGraphAsync(cancellationToken);
+        return VisibleTerritoriesForUser(game, graph, currentUser.UserId);
+    }
+
+    /// <summary>
     /// The territories a given player can see, or null when the game has no fog of war.
     /// Takes the viewer explicitly, for callers without a current user (realtime pushes).
     /// </summary>
@@ -40,6 +55,22 @@ public sealed class FogOfWar(ICurrentUser currentUser, IMapRepository mapReposit
         game.Settings?.HasFogOfWar == true
             ? game.BoardOn(graph).VisibleTo(viewerPlayerId)
             : null;
+
+    /// <summary>
+    /// The territories a given user can see, or null when the game has no fog of war.
+    /// A host who is not playing has no position on the board, so under fog they see nothing
+    /// (the REST endpoint refuses them the same way). For realtime pushes, which address users.
+    /// </summary>
+    public static IReadOnlySet<string>? VisibleTerritoriesForUser(Game game, MapGraph graph, Guid viewerUserId)
+    {
+        if (game.Settings?.HasFogOfWar != true)
+            return null;
+
+        var viewerPlayerId = game.FindPlayerByUser(viewerUserId)?.Id;
+        return viewerPlayerId is { } playerId
+            ? VisibleTerritoriesFor(game, graph, playerId)
+            : new HashSet<string>();
+    }
 
     /// <summary>Rejects a target the player cannot see, so fog cannot be probed by attacking.</summary>
     public void EnsureTargetVisible(Game game, MapGraph graph, Guid playerId, Territory target)

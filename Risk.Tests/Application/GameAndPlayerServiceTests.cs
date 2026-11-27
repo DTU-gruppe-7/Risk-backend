@@ -4,6 +4,7 @@ using Risk.Application.Games;
 using Risk.Application.Players;
 using Risk.Application.Services;
 using Risk.Domain.Entities;
+using Risk.Domain.Map;
 
 namespace Risk.Tests.Application;
 
@@ -38,8 +39,7 @@ public class GameAndPlayerServiceTests
             new FakeMissionCardRepository(),
             _unitOfWork,
             _currentUser,
-            access,
-            fogOfWar);
+            access);
     }
 
     private async Task<GameDetailResponse> CreateGameAsync() =>
@@ -73,6 +73,21 @@ public class GameAndPlayerServiceTests
         var game = await CreateGameAsync();
 
         Assert.Empty(game.Players);
+    }
+
+    [Fact]
+    public async Task The_card_trade_mode_is_chosen_at_creation_and_defaults_to_progressive()
+    {
+        var standard = await CreateGameAsync();
+        var fixedGame = await _gameService.CreateAsync(
+            new CreateGameRequest(4, null, null, null, null, CardTradeMode: CardTradeMode.Fixed));
+
+        Assert.Equal(CardTradeMode.Progressive, standard.Settings!.CardTradeMode);
+        Assert.Equal(CardTradeMode.Fixed, fixedGame.Settings!.CardTradeMode);
+
+        var updated = await _gameService.UpdateSettingsAsync(standard.Id,
+            new UpdateGameSettingRequest(4, 0, 0, false, false, CardTradeMode: CardTradeMode.Fixed));
+        Assert.Equal(CardTradeMode.Fixed, updated.CardTradeMode);
     }
 
     [Fact]
@@ -113,24 +128,82 @@ public class GameAndPlayerServiceTests
     }
 
     [Fact]
-    public async Task Ending_the_attack_phase_after_a_conquest_hands_out_the_conquest_card()
+    public async Task The_conquest_card_is_handed_out_when_the_turn_ends_not_when_the_attack_phase_ends()
     {
         var (game, player) = await StartGameInAttackPhaseAsync();
         game.RecordConquest(player.Id);
 
         await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+        Assert.Empty(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Deployment));
 
         Assert.Single(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+        Assert.NotEqual(player.Id, game.CurrentPlayerId);
     }
 
     [Fact]
-    public async Task Ending_the_attack_phase_without_a_conquest_hands_out_no_card()
+    public async Task Fortifying_ends_the_turn_and_hands_out_the_conquest_card()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+        game.RecordConquest(player.Id);
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+        var from = game.Territories.First(t =>
+            t.OwnerId == player.Id && t.TroopCount > 1 &&
+            ClassicMap.Graph.NeighborsOf(t.Identifier).Any(n => game.Territories.Single(o => o.Identifier == n).OwnerId == player.Id));
+        var to = game.Territories.First(t =>
+            t.OwnerId == player.Id && ClassicMap.Graph.NeighborsOf(from.Identifier).Contains(t.Identifier));
+
+        await _gameService.FortifyAsync(game.Id, new FortifyRequest(from.Id, to.Id, 1));
+
+        Assert.Single(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+        Assert.NotEqual(player.Id, game.CurrentPlayerId);
+    }
+
+    [Fact]
+    public async Task A_turn_without_a_conquest_hands_out_no_card()
     {
         var (game, player) = await StartGameInAttackPhaseAsync();
 
         await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Fortify));
+        await _gameService.CompletePhaseAsync(game.Id, new SetPhaseRequest(GamePhase.Deployment));
 
         Assert.Empty(await _bonusCards.GetByPlayerIdAsync(game.Id, player.Id));
+    }
+
+    [Fact]
+    public async Task Getting_the_game_includes_a_pending_conquest()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+        var from = game.Territories.First(t => t.OwnerId == player.Id);
+        from.AddTroops(3);
+        var to = game.Territories.First(t => t.OwnerId != player.Id && !t.IsBlizzard);
+        to.RemoveTroops(to.TroopCount);
+        game.BeginPendingConquest(player.Id, from, to);
+
+        var response = await _gameService.GetByIdAsync(game.Id);
+
+        Assert.Equal(new PendingConquestResponse(from.Id, to.Id, 1, from.TroopCount - 1), response.PendingConquest);
+    }
+
+    [Fact]
+    public async Task Getting_the_game_includes_the_card_trade_state()
+    {
+        var (game, player) = await StartGameInAttackPhaseAsync();
+        game.ReturnToDeploymentForCardTrade();
+        for (var i = 0; i < Game.ForcedCardTradeThreshold; i++)
+        {
+            var card = new BonusCard(game.Id, BonusCardType.Wild);
+            card.AssignToPlayer(player.Id);
+            _bonusCards.Add(card);
+        }
+
+        var response = await _gameService.GetByIdAsync(game.Id);
+
+        Assert.Equal(0, response.CardSetsTraded);
+        Assert.Equal([4, 6, 8], response.UpcomingTradeValues);
+        Assert.True(response.Players.Single(p => p.Id == player.Id).MustTradeCards);
+        Assert.False(response.Players.Single(p => p.Id != player.Id).MustTradeCards);
     }
 
     [Fact]

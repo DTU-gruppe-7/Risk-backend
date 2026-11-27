@@ -203,6 +203,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
                     b.Property<bool>("HasConqueredTerritoryThisTurn")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("HasReceivedTerritoryBonusThisTurn")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("HostId")
                         .HasColumnType("uuid");
 
@@ -211,6 +214,9 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("PendingConquestToTerritoryId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("Round")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
@@ -246,6 +252,11 @@ namespace Risk.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("BlizzardCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("CardTradeMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<Guid>("GameId")
                         .HasColumnType("uuid");

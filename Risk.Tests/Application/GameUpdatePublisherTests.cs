@@ -1,8 +1,11 @@
+using Risk.Application.Cards;
 using Risk.Application.Common;
 using Risk.Application.Exceptions;
 using Risk.Application.Games;
 using Risk.Domain.Entities;
 using Risk.Domain.Map;
+
+using Risk.Tests.Domain;
 
 namespace Risk.Tests.Application;
 
@@ -23,12 +26,13 @@ public class GameUpdatePublisherTests
         var red = game.AddPlayer(redUser, "red");
         var blue = game.AddPlayer(blueUser, "blue");
         game.ConfigureSettings(6, 0, 0, fog, false);
-        game.Start(Map, new Random(1));
+        game.StartInJoinOrder(Map);
 
         var games = new FakeGameRepository();
         games.Add(game);
         var realtime = new FakeGameRealtime();
-        var publisher = new GameUpdatePublisher(games, new FakeMapRepository(), realtime);
+        var publisher = new GameUpdatePublisher(
+            games, new FakeMapRepository(), realtime, new ForcedCardTradeGuard(new FakeBonusCardRepository()));
         return new Setup(game, red, blue, redUser, blueUser, host, publisher, realtime);
     }
 
@@ -66,11 +70,11 @@ public class GameUpdatePublisherTests
         Assert.Equal(visible.Order(), red.Territories.Select(t => t.Identifier));
         Assert.True(red.Territories.Count < s.Game.Territories.Count);
 
-        // Own reinforcements are visible, other players' are hidden (same as REST).
-        Assert.Equal(s.Red.ReinforcementTroops, red.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
+        // Fog of war hides territories, not reinforcements: everyone sees every reserve (same as REST).
         Assert.True(s.Red.ReinforcementTroops > 0);
+        Assert.Equal(s.Red.ReinforcementTroops, red.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
         var blue = s.Realtime.ToUser.Single(u => u.UserId == s.BlueUser).Update;
-        Assert.Equal(0, blue.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
+        Assert.Equal(s.Red.ReinforcementTroops, blue.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
     }
 
     [Fact]
@@ -82,7 +86,94 @@ public class GameUpdatePublisherTests
 
         var host = s.Realtime.ToUser.Single(u => u.UserId == s.HostUser).Update;
         Assert.Empty(host.Territories);
-        Assert.All(host.Game.Players, p => Assert.Equal(0, p.ReinforcementTroops));
+        Assert.Equal(s.Red.ReinforcementTroops, host.Game.Players.Single(p => p.Id == s.Red.Id).ReinforcementTroops);
+    }
+
+    /// <summary>Red (first in turn) conquers a blue neighbour and has not moved troops in yet.</summary>
+    private static (Territory From, Territory To) BeginConquest(Setup s)
+    {
+        var from = s.Game.Territories.First(t =>
+            t.OwnerId == s.Red.Id &&
+            Map.NeighborsOf(t.Identifier).Any(n => s.Game.Territories.Single(o => o.Identifier == n).OwnerId == s.Blue.Id));
+        var to = s.Game.Territories.First(t =>
+            t.OwnerId == s.Blue.Id && Map.NeighborsOf(from.Identifier).Contains(t.Identifier));
+        s.Game.DeployTroops(s.Red.Id, from, s.Red.ReinforcementTroops);
+        to.RemoveTroops(to.TroopCount);
+        s.Game.BeginPendingConquest(s.Red.Id, from, to);
+        return (from, to);
+    }
+
+    [Fact]
+    public async Task Without_fog_the_pending_conquest_is_sent_to_everyone()
+    {
+        var s = Create(fog: false);
+        var (from, to) = BeginConquest(s);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        var pending = Assert.Single(s.Realtime.ToGame).Update.Game.PendingConquest;
+        Assert.Equal(new PendingConquestResponse(from.Id, to.Id, 1, from.TroopCount - 1), pending);
+    }
+
+    [Fact]
+    public async Task With_fog_the_pending_conquest_only_goes_to_those_who_see_both_territories()
+    {
+        var s = Create(fog: true);
+        var (from, to) = BeginConquest(s);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        PendingConquestResponse? For(Guid user) =>
+            s.Realtime.ToUser.Single(u => u.UserId == user).Update.Game.PendingConquest;
+        Assert.Equal(new PendingConquestResponse(from.Id, to.Id, 1, from.TroopCount - 1), For(s.RedUser));
+        Assert.NotNull(For(s.BlueUser));   // the defender sees their lost territory and its attacker
+        Assert.Null(For(s.HostUser));      // a host who only watches sees no territories under fog
+    }
+
+    [Fact]
+    public async Task There_is_no_pending_conquest_when_nothing_waits()
+    {
+        var s = Create(fog: false);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        Assert.Null(Assert.Single(s.Realtime.ToGame).Update.Game.PendingConquest);
+    }
+
+    private static BonusCard CardFor(Setup s, Player owner)
+    {
+        var card = new BonusCard(s.Game.Id, BonusCardType.Infantry);
+        card.AssignToPlayer(owner.Id);
+        return card;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task New_cards_are_announced_to_their_receiver_only_with_the_reason(bool fog)
+    {
+        var s = Create(fog);
+        var drawn = CardFor(s, s.Red);
+        var taken = CardFor(s, s.Red);
+
+        await s.Publisher.PublishAsync(
+            [s.Game.Id], [new CardHandover(drawn, PreviousPlayerId: null), new CardHandover(taken, s.Blue.Id)]);
+
+        Assert.All(s.Realtime.CardsReceived, message => Assert.Equal(s.RedUser, message.UserId));
+        var byReason = s.Realtime.CardsReceived.ToDictionary(m => m.Received.Reason, m => m.Received);
+        Assert.Equal([drawn.Id], byReason[CardsReceivedReason.Conquest].Cards.Select(c => c.Id));
+        Assert.Equal([taken.Id], byReason[CardsReceivedReason.Elimination].Cards.Select(c => c.Id));
+        Assert.All(byReason.Values, message => Assert.Equal(s.Game.Id, message.GameId));
+    }
+
+    [Fact]
+    public async Task Nothing_is_announced_when_no_card_changed_hands()
+    {
+        var s = Create(fog: false);
+
+        await s.Publisher.PublishAsync([s.Game.Id]);
+
+        Assert.Empty(s.Realtime.CardsReceived);
     }
 
     [Fact]

@@ -39,6 +39,9 @@ public sealed class GameSetting
 
     public bool HasBlizzards => BlizzardCount > 0;
 
+    /// <summary>How traded bonus card sets are valued. See <see cref="Services.CardTradeRules"/>.</summary>
+    public CardTradeMode CardTradeMode { get; private set; } = CardTradeMode.Progressive;
+
     // Navigation property
     public Game? Game { get; private set; }
 
@@ -47,14 +50,14 @@ public sealed class GameSetting
 
     public GameSetting(Guid gameId, int maxPlayers = DefaultMaxPlayers, int timer = 0, int turnTimeLimit = 0,
         bool hasFogOfWar = false, bool hasMissions = false, int blizzardCount = 0,
-        GameVictoryMode? victoryMode = null)
+        GameVictoryMode? victoryMode = null, CardTradeMode? cardTradeMode = null)
     {
         GameId = Guard.NotEmpty(gameId, nameof(gameId));
-        Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount, victoryMode);
+        Update(maxPlayers, timer, turnTimeLimit, hasFogOfWar, hasMissions, blizzardCount, victoryMode, cardTradeMode);
     }
 
     internal void Update(int maxPlayers, int timer, int turnTimeLimit, bool hasFogOfWar, bool hasMissions,
-        int blizzardCount = 0, GameVictoryMode? victoryMode = null)
+        int blizzardCount = 0, GameVictoryMode? victoryMode = null, CardTradeMode? cardTradeMode = null)
     {
         MaxPlayers = Guard.InRange(maxPlayers, MinPlayers, DefaultMaxPlayers, nameof(maxPlayers));
         Timer = Guard.NotNegative(timer, nameof(timer));
@@ -63,6 +66,7 @@ public sealed class GameSetting
         VictoryMode = victoryMode ?? (hasMissions ? GameVictoryMode.Mission : GameVictoryMode.CompleteConquest);
         // The upper limit depends on the map, so BlizzardPlacement checks it when the game starts.
         BlizzardCount = Guard.NotNegative(blizzardCount, nameof(blizzardCount));
+        CardTradeMode = cardTradeMode ?? CardTradeMode.Progressive;
     }
 
 }
@@ -71,4 +75,14 @@ public enum GameVictoryMode
 {
     CompleteConquest,
     Mission
+}
+
+/// <summary>How traded bonus card sets are valued.</summary>
+public enum CardTradeMode
+{
+    /// <summary>Every set traded in the game is worth more than the last: 4, 6, 8, 10, 12, 15, then +5.</summary>
+    Progressive,
+
+    /// <summary>3 infantry = 4, 3 cavalry = 6, 3 artillery = 8, one of each = 10.</summary>
+    Fixed
 }

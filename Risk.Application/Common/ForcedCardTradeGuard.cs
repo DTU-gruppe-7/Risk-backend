@@ -15,4 +15,13 @@ public sealed class ForcedCardTradeGuard(IBonusCardRepository bonusCards)
         var hand = await bonusCards.GetByPlayerIdAsync(game.Id, playerId, cancellationToken);
         game.EnsureNoForcedCardTrade(hand.Count);
     }
+
+    /// <summary>
+    /// How many cards the player whose turn it is holds, so responses can tell whether they must trade
+    /// (<see cref="Game.MustTradeCards"/>). 0 when nobody has the turn.
+    /// </summary>
+    public async Task<int> CurrentPlayerHandSizeAsync(Game game, CancellationToken cancellationToken = default) =>
+        game.CurrentPlayerId is { } playerId
+            ? (await bonusCards.GetByPlayerIdAsync(game.Id, playerId, cancellationToken)).Count
+            : 0;
 }

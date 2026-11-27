@@ -10,32 +10,19 @@ namespace Risk.Api.Controllers;
 [Authorize]
 public sealed class BonusCardsController(BonusCardService cards) : ControllerBase
 {
-    /// <summary>Lists bonus cards in a game, optionally filtered by player.</summary>
+    /// <summary>The caller's own cards. Other players' hands and the draw pile are secret.</summary>
     /// <param name="gameId">Game ID.</param>
-    /// <param name="playerId">Optional: only return cards held by this player.</param>
+    /// <param name="playerId">Optional; if given it must be the caller's own player id.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <response code="200">Card list returned.</response>
+    /// <response code="200">The caller's cards (none for a host who only watches).</response>
+    /// <response code="403">Another player's cards were asked for.</response>
     /// <response code="404">Game not found.</response>
     [HttpGet]
     [ProducesResponseType<IEnumerable<BonusCardResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<BonusCardResponse>>> GetAll(Guid gameId, [FromQuery] Guid? playerId, CancellationToken ct)
         => Ok(await cards.GetAllAsync(gameId, playerId, ct));
-
-    /// <summary>Assigns a bonus card from the draw pile to a player.</summary>
-    /// <response code="200">Card assigned.</response>
-    /// <response code="400">The player is not part of this game.</response>
-    /// <response code="403">Caller is not part of the game.</response>
-    /// <response code="404">Card not found.</response>
-    /// <response code="409">Card already used.</response>
-    [HttpPut("{id:guid}/assign")]
-    [ProducesResponseType<BonusCardResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<BonusCardResponse>> Assign(Guid gameId, Guid id, [FromBody] AssignCardRequest request, CancellationToken ct)
-        => Ok(await cards.AssignAsync(gameId, id, request, ct));
 
     /// <summary>Trades exactly three cards for escalating reinforcement troops.</summary>
     [HttpPost("trade-in")]
@@ -46,4 +33,18 @@ public sealed class BonusCardsController(BonusCardService cards) : ControllerBas
     public async Task<ActionResult<TradeCardsResponse>> Trade(
         Guid gameId, [FromBody] TradeCardsRequest request, CancellationToken ct)
         => Ok(await cards.TradeAsync(gameId, request, ct));
+
+    /// <summary>
+    /// Shows what trading the cards would give, without trading them. Works in any phase and for any
+    /// number of cards: anything but a valid set of three gives <c>isValid: false</c>.
+    /// </summary>
+    /// <response code="200">Preview returned.</response>
+    /// <response code="403">A card is not in the caller's hand.</response>
+    [HttpPost("trade-in/preview")]
+    [ProducesResponseType<TradePreviewResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TradePreviewResponse>> PreviewTrade(
+        Guid gameId, [FromBody] TradeCardsRequest request, CancellationToken ct)
+        => Ok(await cards.PreviewTradeAsync(gameId, request, ct));
 }
