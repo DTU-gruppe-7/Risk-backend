@@ -34,6 +34,13 @@ jobs:
       - run: dotnet tool restore
       - run: dotnet restore Risk.slnx --locked-mode
       - run: dotnet build Risk.slnx --no-restore -c Release
+      
+      # Buildet laver openapi.json på ny (OpenApiGenerateDocumentsOnBuild). Er filen i repoet
+      # anderledes, har nogen ændret en DTO uden at committe kontrakten, og frontendens
+      # genererede typer ville være forkerte.
+      - name: Tjek at openapi.json er opdateret
+        run: git diff --exit-code -- Risk.Api/openapi.json
+
       # Testcontainers virker direkte på GitHubs Ubuntu-runners (Docker er installeret)
       - name: Test med coverage
         run: >

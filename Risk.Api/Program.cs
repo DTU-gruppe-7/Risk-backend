@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -63,14 +64,38 @@ if (builder.Environment.IsDevelopment())
     }
 }
 
-// Enums serialiseres som strenge. Uden dette bliver de til rå tal i
-// OpenAPI-dokumentet, og frontendens genererede typer bliver "number".
+// Samme JSON-regler for controllernes svar (MVC) og for OpenAPI-dokumentet. Generatoren læser
+// de generelle HTTP-indstillinger, ikke MVC's, så en converter kun på MVC gav et dokument, der
+// beskrev enums som tal, selvom API'et sendte strenge (opgave 19).
+// - Enums som strenge: "InProgress" i stedet for 1.
+// - Strict: tal skal være tal. Uden den accepterer .NET "5" som 5, og dokumentet beskriver
+//   alle heltal som "integer eller string", så frontendens typer bliver number | string.
+static void ConfigureJson(JsonSerializerOptions options)
+{
+    options.Converters.Add(new JsonStringEnumConverter());
+    options.NumberHandling = JsonNumberHandling.Strict;
+}
+
 builder.Services
     .AddControllers()
-    .AddJsonOptions(options =>
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
+builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 
-builder.Services.AddOpenApi();
+// XML-kommentarer over flere linjer får styresystemets linjeskift: \r\n på Windows og \n på Linux.
+// Uden dette afhænger openapi.json af, hvem der byggede den, og CI's tjek af filen fejler.
+builder.Services.AddOpenApi(options =>
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        foreach (var path in document.Paths.Values)
+            if (path.Operations is not null)
+                foreach (var operation in path.Operations.Values)
+                {
+                    operation.Summary = operation.Summary?.ReplaceLineEndings("\n");
+                    operation.Description = operation.Description?.ReplaceLineEndings("\n");
+                }
+        return Task.CompletedTask;
+    }));
+
 builder.Services.AddRealtime();
 builder.Services.AddApplication();
 // Build tools (OpenAPI generation, dotnet ef) construct the host without running it, and must not start timers.

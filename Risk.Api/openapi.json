@@ -150,7 +150,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Exchanges the refresh cookie for a new access token. The refresh token is rotated:\r\nthe old one stops working and a new cookie is set.",
+        "summary": "Exchanges the refresh cookie for a new access token. The refresh token is rotated:\nthe old one stops working and a new cookie is set.",
         "responses": {
           "200": {
             "description": "A new access token.",
@@ -434,7 +434,7 @@
         "tags": [
           "BonusCards"
         ],
-        "summary": "Shows what trading the cards would give, without trading them. Works in any phase and for any\r\nnumber of cards: anything but a valid set of three gives `isValid: false`.",
+        "summary": "Shows what trading the cards would give, without trading them. Works in any phase and for any\nnumber of cards: anything but a valid set of three gives `isValid: false`.",
         "parameters": [
           {
             "name": "gameId",
@@ -1730,7 +1730,7 @@
         "tags": [
           "MissionCards"
         ],
-        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\r\nso other players' cards are never returned.",
+        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\nso other players' cards are never returned.",
         "parameters": [
           {
             "name": "gameId",
@@ -2430,7 +2430,7 @@
         "tags": [
           "Territories"
         ],
-        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\r\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
+        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
         "parameters": [
           {
             "name": "gameId",
@@ -2885,30 +2885,22 @@
             "format": "uuid"
           },
           "attackingTroopsCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "description": "How many dice the attacker rolls: 1–3, leaving one troop behind.",
             "format": "int32"
           },
           "defendingTroopsCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "description": "Ignored: the server always rolls as many dice as the defender may. Will be removed.",
             "format": "int32"
           },
           "movingTroopsCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "description": "Troops to move in if the territory is conquered; null leaves the conquest pending.",
             "format": "int32"
@@ -2927,40 +2919,24 @@
         "type": "object",
         "properties": {
           "attackerLosses": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "defenderLosses": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "attackerDice": {
             "type": "array",
             "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "type": "integer",
               "format": "int32"
             }
           },
           "defenderDice": {
             "type": "array",
             "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -2974,11 +2950,7 @@
             "type": "boolean"
           },
           "troopsMoved": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32",
             "default": 0
           }
@@ -3020,7 +2992,10 @@
         }
       },
       "BattleSide": {
-        "type": "integer"
+        "enum": [
+          "Attacker",
+          "Defender"
+        ]
       },
       "BlitzRequest": {
         "required": [
@@ -3038,11 +3013,9 @@
             "format": "uuid"
           },
           "movingTroopsCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           }
@@ -3060,38 +3033,22 @@
         "type": "object",
         "properties": {
           "totalAttackerLosses": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "totalDefenderLosses": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "territoryConquered": {
             "type": "boolean"
           },
           "remainingAttackingTerritoryTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "remainingDefendingTerritoryTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "rounds": {
@@ -3101,11 +3058,7 @@
             }
           },
           "troopsMoved": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32",
             "default": 0
           }
@@ -3124,39 +3077,23 @@
           "attackerDice": {
             "type": "array",
             "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "type": "integer",
               "format": "int32"
             }
           },
           "defenderDice": {
             "type": "array",
             "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "type": "integer",
               "format": "int32"
             }
           },
           "attackerLosses": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "defenderLosses": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "comparisons": {
@@ -3208,10 +3145,18 @@
         }
       },
       "BonusCardType": {
-        "type": "integer"
+        "enum": [
+          "Infantry",
+          "Cavalry",
+          "Artillery",
+          "Wild"
+        ]
       },
       "CardTradeMode": {
-        "type": "integer"
+        "enum": [
+          "Progressive",
+          "Fixed"
+        ]
       },
       "CardTradeRulesResponse": {
         "required": [
@@ -3232,36 +3177,20 @@
           "firstProgressiveValues": {
             "type": "array",
             "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "type": "integer",
               "format": "int32"
             }
           },
           "ownedTerritoryBonus": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "cardsPerTrade": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "forcedTradeHandSize": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -3280,11 +3209,7 @@
             }
           },
           "troops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -3306,11 +3231,7 @@
             "format": "uuid"
           },
           "movingTroopsCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -3326,29 +3247,23 @@
         "type": "object",
         "properties": {
           "maxPlayers": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           },
           "timer": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           },
           "turnTimeLimit": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           },
@@ -3365,11 +3280,9 @@
             ]
           },
           "blizzardCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           },
@@ -3408,11 +3321,7 @@
         "type": "object",
         "properties": {
           "troops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -3426,19 +3335,11 @@
         "type": "object",
         "properties": {
           "attackerDie": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "defenderDie": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "winner": {
@@ -3463,11 +3364,7 @@
             "format": "uuid"
           },
           "troops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -3499,11 +3396,7 @@
             "format": "uuid"
           },
           "version": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int64"
           },
           "hostId": {
@@ -3572,11 +3465,7 @@
             "format": "date-time"
           },
           "round": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "pendingConquest": {
@@ -3590,28 +3479,24 @@
             ]
           },
           "cardSetsTraded": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "upcomingTradeValues": {
             "type": "array",
             "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "type": "integer",
               "format": "int32"
             }
           }
         }
       },
       "GamePhase": {
-        "type": "integer"
+        "enum": [
+          "Deployment",
+          "Attack",
+          "Fortify"
+        ]
       },
       "GameSettingResponse": {
         "required": [
@@ -3637,27 +3522,15 @@
             "format": "uuid"
           },
           "maxPlayers": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "timer": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "turnTimeLimit": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "hasFogOfWar": {
@@ -3670,11 +3543,7 @@
             "$ref": "#/components/schemas/GameVictoryMode"
           },
           "blizzardCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "cardTradeMode": {
@@ -3683,7 +3552,11 @@
         }
       },
       "GameState": {
-        "type": "integer"
+        "enum": [
+          "Lobby",
+          "InProgress",
+          "Finished"
+        ]
       },
       "GameSummaryResponse": {
         "required": [
@@ -3713,19 +3586,11 @@
             "$ref": "#/components/schemas/GameState"
           },
           "playerCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "maxPlayers": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "hasFogOfWar": {
@@ -3735,19 +3600,11 @@
             "$ref": "#/components/schemas/GameVictoryMode"
           },
           "blizzardCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "turnTimeLimit": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "createdAt": {
@@ -3763,7 +3620,10 @@
         }
       },
       "GameVictoryMode": {
-        "type": "integer"
+        "enum": [
+          "CompleteConquest",
+          "Mission"
+        ]
       },
       "JoinGameRequest": {
         "required": [
@@ -3827,11 +3687,7 @@
             "type": "string"
           },
           "captureBonus": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -3936,7 +3792,11 @@
         }
       },
       "MissionObjectiveType": {
-        "type": "integer"
+        "enum": [
+          "ControlAllTerritories",
+          "ControlContinent",
+          "EliminatePlayer"
+        ]
       },
       "PendingConquestResponse": {
         "required": [
@@ -3956,19 +3816,11 @@
             "format": "uuid"
           },
           "minTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "maxTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -4018,22 +3870,14 @@
             "type": "string"
           },
           "reinforcementTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "isEliminated": {
             "type": "boolean"
           },
           "turnOrder": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "joinedAt": {
@@ -4070,19 +3914,11 @@
             "type": "string"
           },
           "turnOrder": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "reinforcementTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "isEliminated": {
@@ -4109,11 +3945,9 @@
             ]
           },
           "status": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           },
@@ -4186,11 +4020,7 @@
             "format": "uuid"
           },
           "troopCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "isBlizzard": {
@@ -4220,11 +4050,7 @@
         "type": "object",
         "properties": {
           "troopsAwarded": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "bonusTerritoryId": {
@@ -4235,11 +4061,7 @@
             "format": "uuid"
           },
           "bonusTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32",
             "default": 0
           }
@@ -4258,11 +4080,9 @@
             "type": "boolean"
           },
           "troops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           },
@@ -4274,11 +4094,7 @@
             "format": "uuid"
           },
           "bonusTroops": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         }
@@ -4294,27 +4110,15 @@
         "type": "object",
         "properties": {
           "maxPlayers": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "timer": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "turnTimeLimit": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "hasFogOfWar": {
@@ -4324,11 +4128,7 @@
             "type": "boolean"
           },
           "blizzardCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32",
             "default": 0
           },
@@ -4406,11 +4206,9 @@
             ]
           },
           "status": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ],
             "format": "int32"
           },
