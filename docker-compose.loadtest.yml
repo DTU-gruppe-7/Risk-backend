@@ -1,0 +1,18 @@
+# Kun til belastningstest med k6 (se loadtest/). Bruges oven på docker-compose.yml:
+#   docker compose -p risk-loadtest -f docker-compose.yml -f docker-compose.loadtest.yml up -d --build
+# Eget projektnavn = egen database-volume, så testbrugere ikke havner i udviklingsdatabasen.
+#
+# Grænserne efterligner prod på VM'en (1 vCPU, Xeon E5-2620 v4): samme mem_limit som prod,
+# og API og database deler én CPU. En kerne her er hurtigere end VM'ens, så tallene er et bedste bud.
+services:
+  db:
+    container_name: risk-loadtest-db
+    cpus: 0.5
+    mem_limit: 512m
+  api:
+    container_name: risk-loadtest-api
+    cpus: 0.5
+    mem_limit: 512m
+    environment:
+      # Alle virtuelle brugere kommer fra samme IP. Uden en højere grænse giver registrering 429.
+      RateLimiting__AuthPermitLimit: "100000"

@@ -54,6 +54,7 @@ public class GameRepository(AppDbContext context) : Repository<Game>(context), I
             .Include(g => g.Settings)
             .Include(g => g.Players)
             .Include(g => g.Territories)
+            .AsSplitQuery()
             .Where(g => g.State == GameState.InProgress && g.Settings != null && g.Settings.TurnTimeLimit > 0)
             .ToListAsync(cancellationToken);
 }

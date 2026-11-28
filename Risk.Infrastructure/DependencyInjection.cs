@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Identity;
+using Npgsql;
 using Risk.Application.Interfaces;
 using Risk.Application.Interfaces.Repository;
 using Risk.Application.Interfaces.Services;
@@ -23,7 +24,7 @@ public static class DependencyInjection
     {
         // Database
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("Default")));
+            options.UseNpgsql(WithoutJit(configuration.GetConnectionString("Default"))));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Identity
@@ -72,5 +73,21 @@ public static class DependencyInjection
         services.AddSingleton<IDiceRoller, DiceRoller>();
 
         return services;
+    }
+    
+    /// <summary>
+    /// Slår Postgres' JIT-kompilering fra for API'ets forbindelser. JIT hjælper store analytiske
+    /// queries, men koster 100+ ms at kompilere pr. kørsel, og API'ets queries tager under 1 ms.
+    /// Et for højt prisskøn (to Include af samlinger og manglende statistik) fik Postgres til at
+    /// JIT-kompilere TurnTimeoutWorkers query hvert sekund, så dev-databasen brugte det meste af en CPU.
+    /// </summary>
+    internal static string? WithoutJit(string? connectionString)
+    {
+        if (string.IsNullOrEmpty(connectionString))
+            return connectionString;
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        builder.Options = string.Join(' ', builder.Options, "-c jit=off").Trim();
+        return builder.ConnectionString;
     }
 }
