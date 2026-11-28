@@ -88,14 +88,14 @@ builder.Services.AddOpenApi(options =>
     {
         foreach (var path in document.Paths.Values)
             if (path.Operations is not null)
-            foreach (var operation in path.Operations.Values)
-            {
-                operation.Summary = operation.Summary?.ReplaceLineEndings("\n");
-                operation.Description = operation.Description?.ReplaceLineEndings("\n");
-            }
+                foreach (var operation in path.Operations.Values)
+                {
+                    operation.Summary = operation.Summary?.ReplaceLineEndings("\n");
+                    operation.Description = operation.Description?.ReplaceLineEndings("\n");
+                }
         return Task.CompletedTask;
     }));
-    
+
 builder.Services.AddRealtime();
 builder.Services.AddApplication();
 // Build tools (OpenAPI generation, dotnet ef) construct the host without running it, and must not start timers.
