@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -63,12 +64,22 @@ if (builder.Environment.IsDevelopment())
     }
 }
 
-// Enums serialiseres som strenge. Uden dette bliver de til rå tal i
-// OpenAPI-dokumentet, og frontendens genererede typer bliver "number".
+// Samme JSON-regler for controllernes svar (MVC) og for OpenAPI-dokumentet. Generatoren læser
+// de generelle HTTP-indstillinger, ikke MVC's, så en converter kun på MVC gav et dokument, der
+// beskrev enums som tal, selvom API'et sendte strenge (opgave 19).
+// - Enums som strenge: "InProgress" i stedet for 1.
+// - Strict: tal skal være tal. Uden den accepterer .NET "5" som 5, og dokumentet beskriver
+//   alle heltal som "integer eller string", så frontendens typer bliver number | string.
+static void ConfigureJson(JsonSerializerOptions options)
+{
+    options.Converters.Add(new JsonStringEnumConverter());
+    options.NumberHandling = JsonNumberHandling.Strict;
+}
+
 builder.Services
     .AddControllers()
-    .AddJsonOptions(options =>
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
+builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 
 builder.Services.AddOpenApi();
 builder.Services.AddRealtime();
