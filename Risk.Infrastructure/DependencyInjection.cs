@@ -74,7 +74,7 @@ public static class DependencyInjection
 
         return services;
     }
-    
+
     /// <summary>
     /// Slår Postgres' JIT-kompilering fra for API'ets forbindelser. JIT hjælper store analytiske
     /// queries, men koster 100+ ms at kompilere pr. kørsel, og API'ets queries tager under 1 ms.
