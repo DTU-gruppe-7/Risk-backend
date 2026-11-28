@@ -150,7 +150,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Exchanges the refresh cookie for a new access token. The refresh token is rotated:\r\nthe old one stops working and a new cookie is set.",
+        "summary": "Exchanges the refresh cookie for a new access token. The refresh token is rotated:\nthe old one stops working and a new cookie is set.",
         "responses": {
           "200": {
             "description": "A new access token.",
@@ -434,7 +434,7 @@
         "tags": [
           "BonusCards"
         ],
-        "summary": "Shows what trading the cards would give, without trading them. Works in any phase and for any\r\nnumber of cards: anything but a valid set of three gives `isValid: false`.",
+        "summary": "Shows what trading the cards would give, without trading them. Works in any phase and for any\nnumber of cards: anything but a valid set of three gives `isValid: false`.",
         "parameters": [
           {
             "name": "gameId",
@@ -1730,7 +1730,7 @@
         "tags": [
           "MissionCards"
         ],
-        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\r\nso other players' cards are never returned.",
+        "summary": "Returns the caller's own mission card(s) in the game. Missions are secret,\nso other players' cards are never returned.",
         "parameters": [
           {
             "name": "gameId",
@@ -2430,7 +2430,7 @@
         "tags": [
           "Territories"
         ],
-        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\r\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
+        "summary": "Lists every territory's state in a game (blizzards included), optionally filtered by owner.\nEmpty until the game has started. Continents and neighbours come from `GET /api/map`.",
         "parameters": [
           {
             "name": "gameId",

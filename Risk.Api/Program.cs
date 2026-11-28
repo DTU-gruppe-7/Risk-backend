@@ -81,7 +81,21 @@ builder.Services
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
 builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 
-builder.Services.AddOpenApi();
+// XML-kommentarer over flere linjer får styresystemets linjeskift: \r\n på Windows og \n på Linux.
+// Uden dette afhænger openapi.json af, hvem der byggede den, og CI's tjek af filen fejler.
+builder.Services.AddOpenApi(options =>
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        foreach (var path in document.Paths.Values)
+            if (path.Operations is not null)
+            foreach (var operation in path.Operations.Values)
+            {
+                operation.Summary = operation.Summary?.ReplaceLineEndings("\n");
+                operation.Description = operation.Description?.ReplaceLineEndings("\n");
+            }
+        return Task.CompletedTask;
+    }));
+    
 builder.Services.AddRealtime();
 builder.Services.AddApplication();
 // Build tools (OpenAPI generation, dotnet ef) construct the host without running it, and must not start timers.
