@@ -24,7 +24,9 @@ public static class DependencyInjection
     {
         // Database
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(WithoutJit(configuration.GetConnectionString("Default"))));
+            options.UseNpgsql(ConnectionStringForApi(
+                configuration.GetConnectionString("Default"),
+                configuration.GetValue("Database:MaxPoolSize", 20))));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Identity
@@ -76,17 +78,26 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Slår Postgres' JIT-kompilering fra for API'ets forbindelser. JIT hjælper store analytiske
-    /// queries, men koster 100+ ms at kompilere pr. kørsel, og API'ets queries tager under 1 ms.
-    /// Et for højt prisskøn (to Include af samlinger og manglende statistik) fik Postgres til at
-    /// JIT-kompilere TurnTimeoutWorkers query hvert sekund, så dev-databasen brugte det meste af en CPU.
+    /// Tilpasser API'ets forbindelse til en lille server (1 vCPU, 256–512 MiB til databasen).
+    /// <list type="bullet">
+    /// <item><b>jit=off</b>: JIT hjælper store analytiske queries, men koster 100+ ms at kompilere pr.
+    /// kørsel, og API'ets queries tager under 1 ms. Et for højt prisskøn fik Postgres til at
+    /// JIT-kompilere TurnTimeoutWorkers query hvert sekund (opgave 26).</item>
+    /// <item><b>Maximum Pool Size</b>: Npgsqls standard er 100, men Postgres har kun 97 ledige forbindelser,
+    /// og på én CPU giver flere samtidige forbindelser ikke mere gennemløb. I stresstesten (opgave 14)
+    /// hævede en pulje på 20 grænsen fra cirka 75 til over 100 lobby-indlæsninger i sekundet, og
+    /// fejlene om manglende forbindelser forsvandt (opgave 27).</item>
+    /// </list>
     /// </summary>
-    internal static string? WithoutJit(string? connectionString)
+    internal static string? ConnectionStringForApi(string? connectionString, int maxPoolSize)
     {
         if (string.IsNullOrEmpty(connectionString))
             return connectionString;
 
-        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            MaxPoolSize = maxPoolSize,
+        };
         builder.Options = string.Join(' ', builder.Options, "-c jit=off").Trim();
         return builder.ConnectionString;
     }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Risk.Infrastructure.Persistence;
 
 namespace Risk.Tests.Integration;
@@ -20,5 +21,18 @@ public sealed class DatabaseSettingsTests(ApiFixture api)
             .SingleAsync();
 
         Assert.Equal("off", jit);
+    }
+
+    // Npgsqls standard er 100 forbindelser, men Postgres har kun 97 ledige. I stresstesten gav det
+    // fejlen 53300, og en pulje på 20 gav mere gennemløb på én CPU (opgave 27).
+    [Fact]
+    public async Task The_api_connection_pool_is_limited()
+    {
+        await using var scope = api.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var builder = new NpgsqlConnectionStringBuilder(db.Database.GetConnectionString());
+
+        Assert.Equal(20, builder.MaxPoolSize);
     }
 }
